@@ -1,0 +1,40 @@
+import argparse
+import sys
+
+from .tool import update_services
+
+
+def command(input_args=None):
+    if input_args is None:
+        input_args = sys.argv[1:]
+
+    parser = argparse.ArgumentParser(
+        description="Checks for new images and updates services if needed."
+    )
+    parser.add_argument(
+        "-s",
+        "--service",
+        type=str,
+        action="append",
+        dest="services",
+        required=True,
+        help="Service to update",
+    )
+    parser.add_argument("--slack", type=str, help="Slack token to use for notification")
+    parser.add_argument(
+        "--check", action="store_true", help="Only check if service needs to be updated"
+    )
+    parser.add_argument("--force", action="store_true", help="Force service update")
+    parser.add_argument(
+        "-v", "--verbosity", type=int, help="Level of verbosity", default=1
+    )
+
+    args = parser.parse_args(input_args)
+
+    update_services(
+        args.services,
+        slack_token=args.slack,
+        verbosity=args.verbosity,
+        only_check=args.check,
+        force=args.force,
+    )
