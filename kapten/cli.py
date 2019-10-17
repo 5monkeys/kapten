@@ -2,7 +2,7 @@ import argparse
 import logging
 import sys
 
-from .tool import update_services
+from .tool import Kapten
 
 
 def command(input_args=None):
@@ -40,9 +40,7 @@ def command(input_args=None):
 
     logging.basicConfig(level=level, format="%(asctime)s - %(message)s")
 
-    update_services(
-        args.services,
-        slack_token=args.slack,
-        only_check=args.check,
-        force=args.force,
+    client = Kapten(
+        args.services, slack_token=args.slack, only_check=args.check, force=args.force
     )
+    client.update_services()
