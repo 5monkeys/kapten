@@ -1,4 +1,5 @@
 import logging
+import socket
 
 import requests
 
@@ -19,10 +20,21 @@ def post(token, text, fields=None, fallback=None):
 
 
 def notify(token, service_name, image_digest, **kwargs):
-    fields = []
+    project = kwargs.get("project", service_name)
+    hostname = socket.gethostname()
+
+    # Host:
+    fields = [{"title": "Host", "value": hostname, "short": True}]
+
+    # Stack:
     if "stack" in kwargs:
         fields.append({"title": "Stack", "value": kwargs["stack"], "short": True})
 
+    # Image:
+    if "image_name" in kwargs:
+        fields.append({"title": "Image", "value": kwargs["image_name"], "short": True})
+
+    # Service:
     fields.append(
         {
             "title": "Service",
@@ -31,12 +43,8 @@ def notify(token, service_name, image_digest, **kwargs):
         }
     )
 
-    if "image_name" in kwargs:
-        fields.append({"title": "Image", "value": kwargs["image_name"], "short": False})
-
+    # Digest:
     fields.append({"title": "Digest", "value": image_digest, "short": False})
-
-    project = kwargs.get("project", service_name)
 
     return post(
         token,
