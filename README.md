@@ -1,5 +1,7 @@
 # kapten
 
+![](https://github.com/5monkeys/kapten/workflows/Test/badge.svg)
+
 Updates a Docker Swarm service when a new image is available.
 
 **Usage:**
