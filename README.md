@@ -7,8 +7,8 @@ Updates a Docker Swarm service when a new image is available.
 **Usage:**
 ```sh
 $ kapten --help
-usage: kapten [-h] -s SERVICES [--slack SLACK] [--check] [--force]
-              [-v VERBOSITY]
+usage: kapten [-h] -s SERVICES [-p PROJECT] [--slack SLACK] [--check]
+              [--force] [-v VERBOSITY]
 
 Checks for new images and updates services if needed.
 
@@ -16,6 +16,8 @@ optional arguments:
   -h, --help            show this help message and exit
   -s SERVICES, --service SERVICES
                         Service to update
+  -p PROJECT, --project PROJECT
+                        Optional project name
   --slack SLACK         Slack token to use for notification
   --check               Only check if service needs to be updated
   --force               Force service update

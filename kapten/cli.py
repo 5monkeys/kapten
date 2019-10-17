@@ -21,6 +21,7 @@ def command(input_args=None):
         required=True,
         help="Service to update",
     )
+    parser.add_argument("-p", "--project", type=str, help="Optional project name")
     parser.add_argument("--slack", type=str, help="Slack token to use for notification")
     parser.add_argument(
         "--check", action="store_true", help="Only check if service needs to be updated"
@@ -41,6 +42,10 @@ def command(input_args=None):
     logging.basicConfig(level=level, format="%(asctime)s - %(message)s")
 
     client = Kapten(
-        args.services, slack_token=args.slack, only_check=args.check, force=args.force
+        args.services,
+        project=args.project,
+        slack_token=args.slack,
+        only_check=args.check,
+        force=args.force,
     )
     client.update_services()

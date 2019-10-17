@@ -60,12 +60,12 @@ class KaptenTestCase(unittest.TestCase):
     @contextlib.contextmanager
     def mock_slack(self, response="ok", token="token"):
         slack_url = "https://hooks.slack.com/services/%s" % token
-        with responses.RequestsMock() as mock_response:
-            mock_response.add(
+        with responses.RequestsMock() as mock_responses:
+            mock_responses.add(
                 responses.POST,
                 slack_url,
                 body=response,
                 status=200,
                 content_type="text/html",
             )
-            yield
+            yield mock_responses

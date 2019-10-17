@@ -8,8 +8,16 @@ logger = logging.getLogger(__name__)
 
 
 class Kapten(object):
-    def __init__(self, service_names, slack_token=None, only_check=False, force=False):
+    def __init__(
+        self,
+        service_names,
+        project=None,
+        slack_token=None,
+        only_check=False,
+        force=False,
+    ):
         self.service_names = service_names
+        self.project = project
         self.slack_token = slack_token
         self.only_check = only_check
         self.force = force
@@ -67,6 +75,7 @@ class Kapten(object):
                     self.slack_token,
                     service_name,
                     latest_digest,
+                    project=self.project,
                     stack=stack,
                     service_short_name=service_short_name,
                     image_name=image_name,

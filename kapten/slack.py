@@ -36,9 +36,11 @@ def notify(token, service_name, image_digest, **kwargs):
 
     fields.append({"title": "Digest", "value": image_digest, "short": False})
 
+    project = kwargs.get("project", service_name)
+
     return post(
         token,
-        "Deployment of *{}* has started.".format(service_name),
+        "Deployment of *{}* has started.".format(project),
         fallback="Deploying {}, {}".format(service_name, image_digest),
         fields=fields,
     )
