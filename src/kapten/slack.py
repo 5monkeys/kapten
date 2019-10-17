@@ -1,7 +1,12 @@
+import logging
+
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 def post(token, text, fields=None, fallback=None):
+    logger.debug("Notifying Slack...")
     payload = {"text": text}
     if fields:
         payload["attachments"] = [

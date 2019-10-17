@@ -1,9 +1,10 @@
-from datetime import datetime
+import logging
 
 from docker.api import APIClient
 
 from . import slack
 
+logger = logging.getLogger(__name__)
 client = APIClient()
 
 
@@ -13,7 +14,7 @@ def get_latest_digest(image_name):
     return digest
 
 
-def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=False):
+def update_service(spec, slack_token=None, only_check=False, force=False):
     service_id = spec["ID"]
     service_version = spec["Version"]["Index"]
     service_name = spec["Spec"]["Name"]
@@ -32,23 +33,18 @@ def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=
     latest_digest = get_latest_digest(image_name)
     latest_image = "{}@{}".format(image_name, latest_digest)
 
-    if verbosity >= 2:
-        print("Stack:     {}".format(stack or "-"))
-        print("Service:   {}".format(service_short_name))
-        print("Image:     {}".format(image_name))
-        print("  Current: {}".format(current_digest))
-        print("  Latest:  {}".format(latest_digest))
+    logger.debug("Stack:     %s", stack or "-")
+    logger.debug("Service:   %s", service_short_name)
+    logger.debug("Image:     %s", image_name)
+    logger.debug("  Current: %s", current_digest)
+    logger.debug("  Latest:  %s", latest_digest)
 
     if force or latest_digest != current_digest:
         if only_check:
-            print("Can update service {} to {}".format(service_name, latest_image))
+            logger.info("Can update service %s to %s", service_name, latest_image)
             return
 
-        if verbosity >= 1:
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(
-                "{} - Updating service {} to {}".format(now, service_name, latest_image)
-            )
+        logger.info("Updating service %s to %s", service_name, latest_image)
 
         # Update service to latest image
         task_template["ContainerSpec"]["Image"] = latest_image
@@ -59,11 +55,8 @@ def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=
             fetch_current_spec=True,
         )
 
+        # Notify slack
         if slack_token:
-            # Notify slack
-            if verbosity >= 2:
-                print("Notifying Slack...")
-
             slack.notify(
                 slack_token,
                 service_name,
@@ -74,23 +67,19 @@ def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=
             )
 
 
-def update_services(
-    service_names, slack_token=None, verbosity=1, only_check=False, force=False
-):
+def update_services(service_names, slack_token=None, only_check=False, force=False):
     service_specs = client.services({"name": service_names})
     for service_spec in service_specs:
         try:
             update_service(
                 service_spec,
                 slack_token=slack_token,
-                verbosity=verbosity,
                 only_check=only_check,
                 force=force,
             )
         except Exception as e:
-            if verbosity > 0:
-                print(
-                    "Failed to update service {}: {}".format(
-                        service_spec["Spec"]["Name"], e.message
-                    )
-                )
+            logger.critical(
+                "Failed to update service %s: %s",
+                service_spec["Spec"]["Name"],
+                e.message,
+            )

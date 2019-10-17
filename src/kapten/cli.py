@@ -1,4 +1,5 @@
 import argparse
+import logging
 import sys
 
 from .tool import update_services
@@ -31,10 +32,17 @@ def command(input_args=None):
 
     args = parser.parse_args(input_args)
 
+    level = logging.INFO
+    if args.verbosity == 0:
+        level = logging.CRITICAL
+    elif args.verbosity > 1:
+        level = logging.DEBUG
+
+    logging.basicConfig(level=level, format="%(asctime)s - %(message)s")
+
     update_services(
         args.services,
         slack_token=args.slack,
-        verbosity=args.verbosity,
         only_check=args.check,
         force=args.force,
     )
