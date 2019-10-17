@@ -27,4 +27,6 @@ setup(
     packages=["kapten"],
     entry_points={"console_scripts": ["kapten = kapten.cli:command"]},
     install_requires=["docker"],
+    tests_require=["responses"],
+    test_suite="tests",
 )
