@@ -18,17 +18,16 @@ class CLICommandTestCase(KaptenTestCase):
         }
         argv = self.build_sys_args(services.keys(), "--slack", "token")
 
-        with self.mock_docker_api(services) as client:
-            with self.mock_slack():
-                cli.command(argv)
-                update_service_calls = client.update_service.mock_calls
-                self.assertEqual(len(update_service_calls), 2)
+        with self.mock_docker_api(services) as client, self.mock_slack():
+            cli.command(argv)
+            update_service_calls = client.update_service.mock_calls
+            self.assertEqual(len(update_service_calls), 2)
 
-                tpl1 = update_service_calls[0].kwargs["task_template"]
-                self.assertTrue(tpl1["ContainerSpec"]["Image"].endswith("2"))
+            tpl1 = update_service_calls[0][2]["task_template"]
+            self.assertTrue(tpl1["ContainerSpec"]["Image"].endswith("2"))
 
-                tpl2 = update_service_calls[1].kwargs["task_template"]
-                self.assertTrue(tpl2["ContainerSpec"]["Image"].endswith("2"))
+            tpl2 = update_service_calls[1][2]["task_template"]
+            self.assertTrue(tpl2["ContainerSpec"]["Image"].endswith("2"))
 
     def test_command_only_check(self):
         services = {

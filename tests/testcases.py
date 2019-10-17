@@ -1,12 +1,18 @@
 import contextlib
 import unittest
-
-import mock
 from random import randint
+from unittest import mock
+
 import responses
 
 
 class KaptenTestCase(unittest.TestCase):
+    def setUp(self):
+        self.logger_mock = mock.MagicMock()
+        mocker = mock.patch("kapten.tool.logger", self.logger_mock)
+        mocker.start()
+        self.addCleanup(mocker.stop)
+
     def build_service_spec(self, service_name, image_name):
         stack = service_name.split("_")[0]
         return {

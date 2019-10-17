@@ -15,7 +15,7 @@ def post(token, text, fields=None, fallback=None):
     response = requests.post(
         "https://hooks.slack.com/services/{}".format(token), json=payload
     )
-    return response.content == "ok"
+    return response.text == "ok"
 
 
 def notify(token, service_name, image_digest, **kwargs):
