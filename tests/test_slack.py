@@ -5,7 +5,7 @@ from .testcases import KaptenTestCase
 
 class SlackTestCase(KaptenTestCase):
     def test_notify(self):
-        with self.mock_slack("ok", token="token"):
+        with self.mock_slack(token="token"):
             success = slack.notify(
                 "token",
                 "stack_service",
