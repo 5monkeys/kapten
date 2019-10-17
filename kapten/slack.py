@@ -12,9 +12,10 @@ def post(token, text, fields=None, fallback=None):
         payload["attachments"] = [
             {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
         ]
-    return requests.post(
+    response = requests.post(
         "https://hooks.slack.com/services/{}".format(token), json=payload
     )
+    return response.content == "ok"
 
 
 def notify(token, service_name, image_digest, **kwargs):
