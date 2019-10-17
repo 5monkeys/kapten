@@ -1,7 +1,8 @@
 from datetime import datetime
 
-import requests
 from docker.api import APIClient
+
+from . import slack
 
 client = APIClient()
 
@@ -10,38 +11,6 @@ def get_latest_digest(image_name):
     data = client.inspect_distribution(image_name)
     digest = data["Descriptor"]["digest"]
     return digest
-
-
-def notify_slack(token, service_name, image_digest, **kwargs):
-    fields = []
-    if "stack" in kwargs:
-        fields.append({"title": "Stack", "value": kwargs["stack"], "short": True})
-
-    fields.append(
-        {
-            "title": "Service",
-            "value": kwargs.get("service_short_name", service_name),
-            "short": True,
-        }
-    )
-
-    if "image_name" in kwargs:
-        fields.append({"title": "Image", "value": kwargs["image_name"], "short": False})
-
-    fields.append({"title": "Digest", "value": image_digest, "short": False})
-
-    payload = {
-        "text": "Deployment of *{}* has started.".format(service_name),
-        "attachments": [
-            {
-                "color": "#50ba32",
-                "fallback": "Deploying {}, {}".format(service_name, image_digest),
-                "fields": fields,
-            }
-        ],
-    }
-
-    requests.post("https://hooks.slack.com/services/{}".format(token), json=payload)
 
 
 def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=False):
@@ -95,7 +64,7 @@ def update_service(spec, slack_token=None, verbosity=1, only_check=False, force=
             if verbosity >= 2:
                 print("Notifying Slack...")
 
-            notify_slack(
+            slack.notify(
                 slack_token,
                 service_name,
                 latest_digest,
