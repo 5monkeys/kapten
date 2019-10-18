@@ -1,4 +1,3 @@
-import logging
 import socket
 
 import requests
@@ -6,9 +5,11 @@ import requests
 from .log import logger
 
 
-def post(token, text, fields=None, fallback=None):
+def post(token, text, fields=None, fallback=None, channel=None):
     logger.debug("Notifying Slack...")
-    payload = {"text": text}
+    payload = {"username": "Kapten", "text": text}
+    if channel:
+        payload["channel"] = channel
     if fields:
         payload["attachments"] = [
             {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
@@ -19,7 +20,7 @@ def post(token, text, fields=None, fallback=None):
     return response.text == "ok"
 
 
-def notify(token, service_name, image_digest, **kwargs):
+def notify(token, service_name, image_digest, channel=None, **kwargs):
     project = kwargs.get("project", service_name)
     hostname = socket.gethostname()
 
@@ -48,7 +49,8 @@ def notify(token, service_name, image_digest, **kwargs):
 
     return post(
         token,
-        "Deployment of *{}* has started.".format(project),
+        channel=channel,
+        text="Deployment of *{}* has started.".format(project),
         fallback="Deploying {}, {}".format(service_name, image_digest),
         fields=fields,
     )

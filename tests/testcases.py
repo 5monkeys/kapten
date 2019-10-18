@@ -1,4 +1,5 @@
 import contextlib
+import json
 import unittest
 from random import randint
 from unittest import mock
@@ -70,3 +71,6 @@ class KaptenTestCase(unittest.TestCase):
                 content_type="text/html",
             )
             yield mock_responses
+
+    def get_request_body(self, requests_mock, call_number=0):
+        return json.loads(requests_mock.calls[call_number].request.body.decode("utf-8"))

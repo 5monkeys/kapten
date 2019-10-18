@@ -10,12 +10,14 @@ class Kapten(object):
         service_names,
         project=None,
         slack_token=None,
+        slack_channel=None,
         only_check=False,
         force=False,
     ):
         self.service_names = service_names
         self.project = project
         self.slack_token = slack_token
+        self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
         self.client = APIClient()
@@ -72,6 +74,7 @@ class Kapten(object):
                     self.slack_token,
                     service_name,
                     latest_digest,
+                    channel=self.slack_channel,
                     project=self.project,
                     stack=stack,
                     service_short_name=service_short_name,
