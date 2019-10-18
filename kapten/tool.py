@@ -1,10 +1,7 @@
-import logging
-
 from docker.api import APIClient
 
 from . import slack
-
-logger = logging.getLogger(__name__)
+from .log import logger
 
 
 class Kapten(object):

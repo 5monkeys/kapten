@@ -9,9 +9,10 @@ import responses
 class KaptenTestCase(unittest.TestCase):
     def setUp(self):
         self.logger_mock = mock.MagicMock()
-        mocker = mock.patch("kapten.tool.logger", self.logger_mock)
-        mocker.start()
-        self.addCleanup(mocker.stop)
+        for module in ["cli", "tool", "slack"]:
+            mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
+            mocker.start()
+            self.addCleanup(mocker.stop)
 
     def build_service_spec(self, service_name, image_name):
         stack = service_name.split("_")[0]

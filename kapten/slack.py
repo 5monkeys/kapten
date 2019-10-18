@@ -3,7 +3,7 @@ import socket
 
 import requests
 
-logger = logging.getLogger(__name__)
+from .log import logger
 
 
 def post(token, text, fields=None, fallback=None):

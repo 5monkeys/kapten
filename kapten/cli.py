@@ -2,6 +2,7 @@ import argparse
 import logging
 import sys
 
+from .log import logger
 from .tool import Kapten
 
 
@@ -39,7 +40,7 @@ def command(input_args=None):
     elif args.verbosity > 1:
         level = logging.DEBUG
 
-    logging.basicConfig(level=level, format="%(asctime)s - %(message)s")
+    logger.setLevel(level)
 
     client = Kapten(
         args.services,
