@@ -32,7 +32,7 @@ class CLICommandTestCase(KaptenTestCase):
             tpl2 = update_service_calls[1][2]["task_template"]
             self.assertTrue(tpl2["ContainerSpec"]["Image"].endswith("2"))
 
-            slack_body = json.loads(slack.calls[0].request.body)
+            slack_body = json.loads(slack.calls[0].request.body.decode("utf-8"))
             self.assertEqual(slack_body["text"], "Deployment of *apa* has started.")
 
     def test_command_only_check(self):
