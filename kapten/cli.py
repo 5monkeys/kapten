@@ -5,6 +5,7 @@ import sys
 from . import __version__
 from .log import logger
 from .tool import Kapten
+from .exceptions import KaptenError
 
 
 def command(input_args=None):
@@ -76,4 +77,8 @@ def command(input_args=None):
         only_check=args.check,
         force=args.force,
     )
-    client.update_services()
+    try:
+        client.update_services()
+    except KaptenError as e:
+        logger.critical(str(e))
+        exit(666)

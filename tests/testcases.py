@@ -33,16 +33,22 @@ class KaptenTestCase(unittest.TestCase):
         }
 
     @contextlib.contextmanager
-    def mock_docker_api(self, services=None):
+    def mock_docker_api(
+        self, services=None, service_failure=False, registry_failure=False
+    ):
         with mock.patch("kapten.tool.APIClient") as APIClient:
             # Client instance
             client = APIClient.return_value
 
             # Mock APIClient.services()
-            specs = [
-                self.build_service_spec(service_name, image_name)
-                for service_name, image_name in services.items()
-            ]
+            specs = (
+                [
+                    self.build_service_spec(service_name, image_name)
+                    for service_name, image_name in services.items()
+                ]
+                if not service_failure
+                else []
+            )
             client.services = mock.MagicMock(return_value=specs)
 
             # Mock APIClient.inspect_distribution()
@@ -52,6 +58,8 @@ class KaptenTestCase(unittest.TestCase):
                 ][0]
                 _, digest = image.rsplit(":", 1)
                 digest = str(int(digest) + 1)
+                if registry_failure:
+                    return {}
                 return {"Descriptor": {"digest": "sha256:" + digest}}
 
             client.inspect_distribution = mock.MagicMock(

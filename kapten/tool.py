@@ -1,6 +1,7 @@
 from docker.api import APIClient
 
 from . import slack
+from .exceptions import KaptenError
 from .log import logger
 
 
@@ -83,12 +84,15 @@ class Kapten(object):
 
     def update_services(self):
         service_specs = self.client.services({"name": self.service_names})
+        if len(service_specs) != len(self.service_names):
+            raise KaptenError("Could not find all given services")
+
         for service_spec in service_specs:
             try:
                 self.update_service(service_spec)
             except Exception as e:
-                logger.critical(
-                    "Failed to update service %s: %s",
-                    service_spec["Spec"]["Name"],
-                    e.message,
+                raise KaptenError(
+                    "Failed to update service {}: {}".format(
+                        service_spec["Spec"]["Name"], str(e)
+                    )
                 )

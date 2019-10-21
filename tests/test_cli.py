@@ -1,6 +1,7 @@
 from itertools import chain, repeat
 
 from kapten import __version__, cli
+from kapten.exceptions import KaptenError
 
 from .testcases import KaptenTestCase
 
@@ -69,3 +70,27 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(["--version"])
         self.assertIn(__version__, stdout.getvalue())
         self.assertEqual(cm.exception.code, 0)
+
+    def test_command_error_missing_services(self):
+        services = {
+            "stack_app": "repository/app_image:latest@sha256:10001",
+            "stack_db": "repository/db_image:latest@sha256:20001",
+        }
+        argv = self.build_sys_args(services.keys())
+
+        with self.mock_docker_api(services, service_failure=True):
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
+    def test_command_error_failing_service(self):
+        services = {
+            "stack_app": "repository/app_image:latest@sha256:10001",
+            "stack_db": "repository/db_image:latest@sha256:20001",
+        }
+        argv = self.build_sys_args(services.keys())
+
+        with self.mock_docker_api(services, registry_failure=True):
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)

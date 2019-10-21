@@ -1,0 +1,2 @@
+class KaptenError(Exception):
+    pass
