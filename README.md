@@ -1,3 +1,5 @@
+<img src="https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png" width="100" />
+
 # kapten
 
 ![](https://github.com/5monkeys/kapten/workflows/Test/badge.svg)
@@ -31,6 +33,6 @@ optional arguments:
 
 **Example:**
 ```sh
-$ kapten --service app --slack abc/def/123
+$ kapten --service app --slack-token T00ABCD0A/ABCDEFGHI/xYzabCDEfGh1aBCCd12abCde
 Updating service app to repo/app:latest@sha256:123456789
 ```

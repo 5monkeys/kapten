@@ -7,7 +7,11 @@ from .log import logger
 
 def post(token, text, fields=None, fallback=None, channel=None):
     logger.debug("Notifying Slack...")
-    payload = {"username": "Kapten", "text": text}
+    payload = {
+        "username": "Kapten",
+        "icon_url": "https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png",
+        "text": text,
+    }
     if channel:
         payload["channel"] = channel
     if fields:
