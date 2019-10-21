@@ -1,6 +1,7 @@
 import contextlib
 import json
 import unittest
+from io import StringIO
 from random import randint
 from unittest import mock
 
@@ -74,3 +75,15 @@ class KaptenTestCase(unittest.TestCase):
 
     def get_request_body(self, requests_mock, call_number=0):
         return json.loads(requests_mock.calls[call_number].request.body.decode("utf-8"))
+
+    @contextlib.contextmanager
+    def mock_stdout(self):
+        out = StringIO()
+        with mock.patch("sys.stdout", out):
+            yield out
+
+    @contextlib.contextmanager
+    def mock_stderr(self):
+        out = StringIO()
+        with mock.patch("sys.stderr", out):
+            yield out

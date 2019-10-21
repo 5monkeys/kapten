@@ -1,6 +1,6 @@
 from itertools import chain, repeat
 
-from kapten import cli
+from kapten import __version__, cli
 
 from .testcases import KaptenTestCase
 
@@ -55,3 +55,17 @@ class CLICommandTestCase(KaptenTestCase):
             cli.command(argv)
             update_service_calls = client.update_service.mock_calls
             self.assertEqual(len(update_service_calls), 0)
+
+    def test_command_required_args(self):
+        with self.assertRaises(SystemExit) as cm:
+            with self.mock_stderr() as stderr:
+                cli.command([])
+        self.assertIn("Missing required", stderr.getvalue())
+        self.assertEqual(cm.exception.code, 2)
+
+    def test_command_version(self):
+        with self.assertRaises(SystemExit) as cm:
+            with self.mock_stdout() as stdout:
+                cli.command(["--version"])
+        self.assertIn(__version__, stdout.getvalue())
+        self.assertEqual(cm.exception.code, 0)

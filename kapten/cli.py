@@ -2,6 +2,7 @@ import argparse
 import logging
 import sys
 
+from . import __version__
 from .log import logger
 from .tool import Kapten
 
@@ -19,7 +20,6 @@ def command(input_args=None):
         type=str,
         action="append",
         dest="services",
-        required=True,
         help="Service to update",
     )
     parser.add_argument("-p", "--project", type=str, help="Optional project name")
@@ -38,9 +38,22 @@ def command(input_args=None):
     parser.add_argument(
         "-v", "--verbosity", type=int, help="Level of verbosity", default=1
     )
+    parser.add_argument(
+        "-V", "--version", action="store_true", help="Show version and exit"
+    )
 
     args = parser.parse_args(input_args)
 
+    # Show version
+    if args.version:
+        print("Kapten {}".format(__version__))
+        exit(0)
+
+    # Validate required args
+    if not args.services:
+        parser.error("Missing required argument SERVICES")
+
+    # Set verbosity
     level = logging.INFO
     if args.verbosity == 0:
         level = logging.CRITICAL
@@ -49,6 +62,7 @@ def command(input_args=None):
 
     logger.setLevel(level)
 
+    # Run tool
     client = Kapten(
         args.services,
         project=args.project,
