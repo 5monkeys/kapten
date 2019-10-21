@@ -42,7 +42,7 @@ class CLICommandTestCase(KaptenTestCase):
             self.assertEqual(slack_body["channel"], "deploy")
             fields = slack_body["attachments"][0]["fields"]
             digest_field = [f["value"] for f in fields if f["title"] == "Digest"][0]
-            self.assertEqual(digest_field, "sha256:10002")
+            self.assertTrue(digest_field.endswith("2"))
 
     def test_command_only_check(self):
         services = {
