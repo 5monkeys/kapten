@@ -28,6 +28,20 @@ class Kapten(object):
         digest = data["Descriptor"]["digest"]
         return digest
 
+    def list_services(self):
+        service_specs = self.client.services({"name": self.service_names})
+
+        # Sort specs in input order and filter out any non exact matches
+        service_specs = sorted(
+            filter(lambda s: s["Spec"]["Name"] in self.service_names, service_specs),
+            key=lambda s: self.service_names.index(s["Spec"]["Name"]),
+        )
+
+        if len(service_specs) != len(self.service_names):
+            raise KaptenError("Could not find all given services")
+
+        return service_specs
+
     def update_service(self, spec):
         service_id = spec["ID"]
         service_version = spec["Version"]["Index"]
@@ -83,10 +97,7 @@ class Kapten(object):
                 )
 
     def update_services(self):
-        service_specs = self.client.services({"name": self.service_names})
-        if len(service_specs) != len(self.service_names):
-            raise KaptenError("Could not find all given services")
-
+        service_specs = self.list_services()
         for service_spec in service_specs:
             try:
                 self.update_service(service_spec)

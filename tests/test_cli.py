@@ -7,18 +7,19 @@ from .testcases import KaptenTestCase
 
 
 class CLICommandTestCase(KaptenTestCase):
-    def build_sys_args(self, service_names, *args):
+    def build_sys_args(self, services, *args):
+        service_names = [name for name, _ in services]
         argv = list(chain(*zip(repeat("-s", len(service_names)), service_names)))
         argv.extend(args)
         return argv
 
     def test_command(self):
-        services = {
-            "stack_app": "repository/app_image:latest@sha256:10001",
-            "stack_db": "repository/db_image:latest@sha256:20001",
-        }
+        services = [
+            ("stack_app", "repository/app_image:latest@sha256:10001"),
+            ("stack_db", "repository/db_image:latest@sha256:20001"),
+        ]
         argv = self.build_sys_args(
-            services.keys(),
+            services,
             "--slack-token",
             "token",
             "--slack-channel",
@@ -33,24 +34,31 @@ class CLICommandTestCase(KaptenTestCase):
             self.assertEqual(len(update_service_calls), 2)
 
             tpl1 = update_service_calls[0][2]["task_template"]
-            self.assertTrue(tpl1["ContainerSpec"]["Image"].endswith("2"))
+            self.assertEqual(
+                tpl1["ContainerSpec"]["Image"],
+                "repository/app_image:latest@sha256:10002",
+            )
 
             tpl2 = update_service_calls[1][2]["task_template"]
-            self.assertTrue(tpl2["ContainerSpec"]["Image"].endswith("2"))
+            self.assertEqual(
+                tpl2["ContainerSpec"]["Image"],
+                "repository/db_image:latest@sha256:20002",
+            )
 
-            slack_body = self.get_request_body(slack_mock)
-            self.assertEqual(slack_body["text"], "Deployment of *apa* has started.")
-            self.assertEqual(slack_body["channel"], "deploy")
-            fields = slack_body["attachments"][0]["fields"]
-            digest_field = [f["value"] for f in fields if f["title"] == "Digest"][0]
-            self.assertTrue(digest_field.endswith("2"))
+            for i, expected_digest in enumerate(["sha256:10002", "sha256:20002"], 1):
+                slack_body = self.get_request_body(slack_mock, call_number=i)
+                self.assertEqual(slack_body["text"], "Deployment of *apa* has started.")
+                self.assertEqual(slack_body["channel"], "deploy")
+                fields = slack_body["attachments"][0]["fields"]
+                digest_field = [f["value"] for f in fields if f["title"] == "Digest"][0]
+                self.assertEqual(digest_field, expected_digest)
 
     def test_command_only_check(self):
-        services = {
-            "stack_app": "repository/app_image:latest@sha256:10001",
-            "stack_db": "repository/db_image:latest@sha256:20001",
-        }
-        argv = self.build_sys_args(services.keys(), "--check")
+        services = [
+            ("stack_app", "repository/app_image:latest@sha256:10001"),
+            ("stack_db", "repository/db_image:latest@sha256:20001"),
+        ]
+        argv = self.build_sys_args(services, "--check")
 
         with self.mock_docker_api(services) as client:
             cli.command(argv)
@@ -72,11 +80,11 @@ class CLICommandTestCase(KaptenTestCase):
         self.assertEqual(cm.exception.code, 0)
 
     def test_command_error_missing_services(self):
-        services = {
-            "stack_app": "repository/app_image:latest@sha256:10001",
-            "stack_db": "repository/db_image:latest@sha256:20001",
-        }
-        argv = self.build_sys_args(services.keys())
+        services = [
+            ("stack_app", "repository/app_image:latest@sha256:10001"),
+            ("stack_db", "repository/db_image:latest@sha256:20001"),
+        ]
+        argv = self.build_sys_args(services)
 
         with self.mock_docker_api(services, service_failure=True):
             with self.assertRaises(SystemExit) as cm:
@@ -84,11 +92,11 @@ class CLICommandTestCase(KaptenTestCase):
             self.assertEqual(cm.exception.code, 666)
 
     def test_command_error_failing_service(self):
-        services = {
-            "stack_app": "repository/app_image:latest@sha256:10001",
-            "stack_db": "repository/db_image:latest@sha256:20001",
-        }
-        argv = self.build_sys_args(services.keys())
+        services = [
+            ("stack_app", "repository/app_image:latest@sha256:10001"),
+            ("stack_db", "repository/db_image:latest@sha256:20001"),
+        ]
+        argv = self.build_sys_args(services)
 
         with self.mock_docker_api(services, registry_failure=True):
             with self.assertRaises(SystemExit) as cm:

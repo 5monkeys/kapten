@@ -13,6 +13,12 @@ coverage:
 		--omit 'venv/*,.eggs/*'
 
 
+.PHONY: format
+format:
+	black kapten
+	isort -rc kapten
+
+
 .PHONY: clean
 clean:
 	rm -rf dist

@@ -44,7 +44,7 @@ class KaptenTestCase(unittest.TestCase):
             specs = (
                 [
                     self.build_service_spec(service_name, image_name)
-                    for service_name, image_name in services.items()
+                    for service_name, image_name in reversed(services)
                 ]
                 if not service_failure
                 else []
@@ -53,9 +53,7 @@ class KaptenTestCase(unittest.TestCase):
 
             # Mock APIClient.inspect_distribution()
             def inspect_distribution_mock(image_name):
-                image = [
-                    img for img in services.values() if img.startswith(image_name)
-                ][0]
+                image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
                 digest = str(int(digest) + 1)
                 if registry_failure:
@@ -81,8 +79,10 @@ class KaptenTestCase(unittest.TestCase):
             )
             yield mock_responses
 
-    def get_request_body(self, requests_mock, call_number=0):
-        return json.loads(requests_mock.calls[call_number].request.body.decode("utf-8"))
+    def get_request_body(self, requests_mock, call_number=1):
+        return json.loads(
+            requests_mock.calls[call_number - 1].request.body.decode("utf-8")
+        )
 
     @contextlib.contextmanager
     def mock_stdout(self):

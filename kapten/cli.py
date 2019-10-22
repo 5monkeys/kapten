@@ -3,9 +3,9 @@ import logging
 import sys
 
 from . import __version__
+from .exceptions import KaptenError
 from .log import logger
 from .tool import Kapten
-from .exceptions import KaptenError
 
 
 def command(input_args=None):
