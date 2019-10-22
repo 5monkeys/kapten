@@ -20,7 +20,8 @@ jobs:
     - name: Lint
       run: |
         pip install flake8
-        flake8 kapten --exit-zero
-    - name: Test
+        make lint
+    - name: Coverage
       run: |
-        make test
+        pip install coverage
+        make coverage
