@@ -13,6 +13,11 @@ coverage:
 		--omit 'venv/*,.eggs/*'
 
 
+.PHONY: lint
+lint:
+	flake8 kapten --exit-zero
+
+
 .PHONY: format
 format:
 	black kapten
