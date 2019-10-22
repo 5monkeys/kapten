@@ -7,7 +7,7 @@
 Updates a Docker Swarm service when a new image is available.
 
 **Usage:**
-```sh
+```console
 $ kapten --help
 usage: kapten [-h] [--version] [-s SERVICES] [-p PROJECT]
               [--slack-token SLACK_TOKEN] [--slack-channel SLACK_CHANNEL]
@@ -33,7 +33,7 @@ optional arguments:
 ```
 
 **Example:**
-```sh
+```console
 $ kapten --service app --slack-token T00ABCD0A/ABCDEFGHI/xYzabCDEfGh1aBCCd12abCde
 Updating service app to repo/app:latest@sha256:123456789
 ```
