@@ -4,7 +4,7 @@ VERSION = (1, 2, 0, "final", 0)
 def get_version(version=None):
     """Derives a PEP386-compliant version number from VERSION."""
     if version is None:
-        version = VERSION
+        version = VERSION  # pragma: nocover
     assert len(version) == 5
     assert version[3] in ("alpha", "beta", "rc", "final")
 
