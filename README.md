@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png" width="100" />
+<img src="https://raw.githubusercontent.com/5monkeys/kapten/master/kapten-text.png" height="200" />
 
 # kapten
 
