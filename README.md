@@ -3,6 +3,8 @@
 # kapten
 
 ![](https://github.com/5monkeys/kapten/workflows/Test/badge.svg)
+[![PyPi Version](https://img.shields.io/pypi/v/kapten.svg)](https://pypi.org/project/kapten/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/kapten.svg)](https://pypi.org/project/kapten/)
 
 Updates a Docker Swarm service when a new image is available.
 
