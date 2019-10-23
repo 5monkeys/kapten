@@ -1,8 +1,9 @@
-<img src="https://raw.githubusercontent.com/5monkeys/kapten/master/kapten-text.png" height="200" />
+<img src="https://raw.githubusercontent.com/5monkeys/kapten/master/kapten-text.png" width="66%" />
 
 # kapten
 
 ![](https://github.com/5monkeys/kapten/workflows/Test/badge.svg)
+[![codecov](https://codecov.io/gh/5monkeys/kapten/branch/master/graph/badge.svg)](https://codecov.io/gh/5monkeys/kapten)
 [![PyPi Version](https://img.shields.io/pypi/v/kapten.svg)](https://pypi.org/project/kapten/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/kapten.svg)](https://pypi.org/project/kapten/)
 
