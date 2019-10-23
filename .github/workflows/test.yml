@@ -25,3 +25,6 @@ jobs:
       run: |
         pip install coverage
         make coverage
+    - uses: codecov/codecov-action@v1.0.3
+      with:
+        token: ${{secrets.CODECOV_TOKEN}}

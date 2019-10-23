@@ -7,6 +7,7 @@ test:
 coverage:
 	coverage run setup.py test
 	coverage report
+	coverage xml
 
 
 .PHONY: lint
