@@ -4,7 +4,7 @@ on: [push]
 
 jobs:
   build:
-
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 4
@@ -25,7 +25,8 @@ jobs:
       run: |
         pip install coverage
         make coverage
-    - uses: codecov/codecov-action@v1.0.3
+    - name: Upload report
+      uses: codecov/codecov-action@v1.0.3
       with:
         token: ${{secrets.CODECOV_TOKEN}}
         name: Python ${{ matrix.python-version }}
