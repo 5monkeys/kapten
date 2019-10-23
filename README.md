@@ -2,14 +2,14 @@
 
 # kapten
 
-![](https://github.com/5monkeys/kapten/workflows/Test/badge.svg)
+![](https://github.com/5monkeys/kapten/workflows/test/badge.svg)
 [![codecov](https://codecov.io/gh/5monkeys/kapten/branch/master/graph/badge.svg)](https://codecov.io/gh/5monkeys/kapten)
 [![PyPi Version](https://img.shields.io/pypi/v/kapten.svg)](https://pypi.org/project/kapten/)
 [![Python Versions](https://img.shields.io/pypi/pyversions/kapten.svg)](https://pypi.org/project/kapten/)
 
 Updates a Docker Swarm service when a new image is available.
 
-**Usage:**
+### Usage
 ```console
 $ kapten --help
 usage: kapten [-h] [--version] [-s SERVICES] [-p PROJECT]
@@ -35,7 +35,7 @@ optional arguments:
                         Level of verbosity.
 ```
 
-**Example:**
+### Example
 ```console
 $ kapten --service app --slack-token T00ABCD0A/ABCDEFGHI/xYzabCDEfGh1aBCCd12abCde
 Updating service app to repo/app:latest@sha256:123456789
