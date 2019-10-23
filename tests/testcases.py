@@ -86,12 +86,10 @@ class KaptenTestCase(unittest.TestCase):
 
     @contextlib.contextmanager
     def mock_stdout(self):
-        out = StringIO()
-        with mock.patch("sys.stdout", out):
-            yield out
+        with mock.patch("sys.stdout", StringIO()) as stdout:
+            yield stdout
 
     @contextlib.contextmanager
     def mock_stderr(self):
-        out = StringIO()
-        with mock.patch("sys.stderr", out):
-            yield out
+        with mock.patch("sys.stderr", StringIO()) as stderr:
+            yield stderr

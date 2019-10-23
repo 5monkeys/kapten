@@ -1,7 +1,10 @@
+import logging
+import unittest
 from itertools import chain, repeat
+from unittest import mock
+from unittest.mock import call
 
 from kapten import __version__, cli
-from kapten.exceptions import KaptenError
 
 from .testcases import KaptenTestCase
 
@@ -53,6 +56,36 @@ class CLICommandTestCase(KaptenTestCase):
                 digest_field = [f["value"] for f in fields if f["title"] == "Digest"][0]
                 self.assertEqual(digest_field, expected_digest)
 
+    def test_command_verbosity(self):
+        services = [("foo", "repo/foo:latest@sha256:123")]
+        with self.mock_docker_api(services):
+            argv = self.build_sys_args(services, "-v", "0")
+            cli.command(argv)
+            argv = self.build_sys_args(services, "-v", "1")
+            cli.command(argv)
+            argv = self.build_sys_args(services, "-v", "2")
+            cli.command(argv)
+
+        self.assertListEqual(
+            self.logger_mock.setLevel.call_args_list,
+            [call(logging.CRITICAL), call(logging.INFO), call(logging.DEBUG)],
+        )
+
+    @unittest.skip("TODO")
+    def test_command_without_slack(self):
+        # TODO: Assert slack.notify not called
+        ...
+
+    @unittest.skip("TODO")
+    def test_command_force(self):
+        # TODO: Assert update_service called
+        ...
+
+    @unittest.skip("TODO")
+    def test_command_noop(self):
+        # TODO: Mock same image, assert update_service not called
+        ...
+
     def test_command_only_check(self):
         services = [
             ("stack_app", "repository/app_image:latest@sha256:10001"),
@@ -73,9 +106,10 @@ class CLICommandTestCase(KaptenTestCase):
         self.assertEqual(cm.exception.code, 2)
 
     def test_command_version(self):
+        argv = ["kapten", "--version"]
         with self.assertRaises(SystemExit) as cm:
-            with self.mock_stdout() as stdout:
-                cli.command(["--version"])
+            with mock.patch("sys.argv", argv), self.mock_stdout() as stdout:
+                cli.command()
         self.assertIn(__version__, stdout.getvalue())
         self.assertEqual(cm.exception.code, 0)
 

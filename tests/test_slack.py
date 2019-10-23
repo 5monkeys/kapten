@@ -28,3 +28,10 @@ class SlackTestCase(KaptenTestCase):
             body = self.get_request_body(mocked)
             self.assertEqual(body["text"], "Deployment of *stack_service* has started.")
             self.assertNotIn("channel", body)
+
+    def test_post_without_fields(self):
+        with self.mock_slack(token="token") as mocked:
+            success = slack.post("token", "Hello world")
+            self.assertTrue(success)
+            body = self.get_request_body(mocked)
+            self.assertNotIn("attachments", body)
