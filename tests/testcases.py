@@ -34,7 +34,11 @@ class KaptenTestCase(unittest.TestCase):
 
     @contextlib.contextmanager
     def mock_docker_api(
-        self, services=None, service_failure=False, registry_failure=False
+        self,
+        services=None,
+        service_failure=False,
+        registry_failure=False,
+        with_new_digest=True,
     ):
         with mock.patch("kapten.tool.APIClient") as APIClient:
             # Client instance
@@ -55,7 +59,8 @@ class KaptenTestCase(unittest.TestCase):
             def inspect_distribution_mock(image_name):
                 image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
-                digest = str(int(digest) + 1)
+                if with_new_digest:
+                    digest = str(int(digest) + 1)
                 if registry_failure:
                     return {}
                 return {"Descriptor": {"digest": "sha256:" + digest}}

@@ -57,34 +57,38 @@ class CLICommandTestCase(KaptenTestCase):
                 self.assertEqual(digest_field, expected_digest)
 
     def test_command_verbosity(self):
-        services = [("foo", "repo/foo:latest@sha256:123")]
+        services = [("foo", "repo/foo:tag@sha256:0")]
         with self.mock_docker_api(services):
-            argv = self.build_sys_args(services, "-v", "0")
-            cli.command(argv)
-            argv = self.build_sys_args(services, "-v", "1")
-            cli.command(argv)
-            argv = self.build_sys_args(services, "-v", "2")
-            cli.command(argv)
+            cli.command(self.build_sys_args(services, "-v", "0"))
+            cli.command(self.build_sys_args(services, "-v", "1"))
+            cli.command(self.build_sys_args(services, "-v", "2"))
 
         self.assertListEqual(
             self.logger_mock.setLevel.call_args_list,
             [call(logging.CRITICAL), call(logging.INFO), call(logging.DEBUG)],
         )
 
-    @unittest.skip("TODO")
     def test_command_without_slack(self):
-        # TODO: Assert slack.notify not called
-        ...
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services)
+        with self.mock_docker_api(services):
+            with mock.patch("kapten.slack.notify") as notify:
+                cli.command(argv)
+                self.assertFalse(notify.called)
 
-    @unittest.skip("TODO")
-    def test_command_force(self):
-        # TODO: Assert update_service called
-        ...
-
-    @unittest.skip("TODO")
     def test_command_noop(self):
-        # TODO: Mock same image, assert update_service not called
-        ...
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services)
+        with self.mock_docker_api(services, with_new_digest=False) as client:
+            cli.command(argv)
+            self.assertFalse(client.update_service.called)
+
+    def test_command_force(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services, "--force")
+        with self.mock_docker_api(services, with_new_digest=False) as client:
+            cli.command(argv)
+            self.assertTrue(client.update_service.called)
 
     def test_command_only_check(self):
         services = [
