@@ -31,6 +31,18 @@ def command(input_args=None):
     )
     parser.add_argument("-p", "--project", type=str, help="Optional project name.")
     parser.add_argument(
+        "--server", action="store_true", help="Run kapten in server mode."
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Kapten server host. [default: 0.0.0.0]",
+    )
+    parser.add_argument(
+        "--port", type=int, default=8000, help="Kapten server port. [default: 8000]"
+    )
+    parser.add_argument(
         "--slack-token", type=str, help="Slack token to use for notification."
     )
     parser.add_argument(
@@ -45,7 +57,11 @@ def command(input_args=None):
     )
     parser.add_argument("--force", action="store_true", help="Force service update.")
     parser.add_argument(
-        "-v", "--verbosity", type=int, default=1, help="Level of verbosity."
+        "-v",
+        "--verbosity",
+        type=int,
+        default=1,
+        help="Level of verbosity. [default: 1]",
     )
 
     args = parser.parse_args(input_args)
@@ -68,8 +84,8 @@ def command(input_args=None):
 
     logger.setLevel(level)
 
-    # Run tool
-    client = Kapten(
+    # Configure
+    captain = Kapten(
         args.services,
         project=args.project,
         slack_token=args.slack_token,
@@ -77,8 +93,22 @@ def command(input_args=None):
         only_check=args.check,
         force=args.force,
     )
-    try:
-        client.update_services()
-    except KaptenError as e:
-        logger.critical(str(e))
-        exit(666)
+
+    if args.server:
+        # Start server
+        try:
+            from kapten import server
+        except ImportError:
+            parser.error(
+                "Unable to start server, ensure starlette and uvicorn is installed"
+            )
+        else:
+            server.run(captain, host=args.host, port=args.port)
+
+    else:
+        # Run one-off check/update
+        try:
+            captain.update_services()
+        except KaptenError as e:
+            logger.critical(str(e))
+            exit(666)
