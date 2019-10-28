@@ -17,8 +17,8 @@ lint:
 
 .PHONY: format
 format:
-	black kapten
-	isort -rc kapten
+	black kapten tests
+	isort -rc kapten tests
 
 
 .PHONY: clean
