@@ -36,15 +36,15 @@ async def dockerhub_webhook(request):
     tag = payload["push_data"]["tag"]
     image_name = "{}:{}".format(repository, tag)
 
-    services = app.state.captain.list_services(image_name)
-    app.state.captain.update_services(services)
+    services = app.state.client.list_services(image_name)
+    app.state.client.update_services(services)
 
     return JSONResponse(
         {"services": [service.name for service in services], "image": image_name}
     )
 
 
-def run(captain: Kapten, host: str, port: int):
+def run(client: Kapten, host: str, port: int):
     logger.info("Starting Kapten {} server ...".format(__version__))
-    app.state.captain = captain
+    app.state.client = client
     uvicorn.run(app, host=host, port=port)

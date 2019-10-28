@@ -2,6 +2,7 @@ import contextlib
 import json
 import unittest
 from io import StringIO
+from itertools import chain, repeat
 from random import randint
 from unittest import mock
 
@@ -15,6 +16,12 @@ class KaptenTestCase(unittest.TestCase):
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
+
+    def build_sys_args(self, services, *args):
+        service_names = [name for name, _ in services]
+        argv = list(chain(*zip(repeat("-s", len(service_names)), service_names)))
+        argv.extend(args)
+        return argv
 
     def build_service_spec(self, service_name, image_name):
         stack = service_name.split("_")[0]

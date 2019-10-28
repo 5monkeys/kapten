@@ -1,6 +1,4 @@
 import logging
-import unittest
-from itertools import chain, repeat
 from unittest import mock
 from unittest.mock import call
 
@@ -10,12 +8,6 @@ from .testcases import KaptenTestCase
 
 
 class CLICommandTestCase(KaptenTestCase):
-    def build_sys_args(self, services, *args):
-        service_names = [name for name, _ in services]
-        argv = list(chain(*zip(repeat("-s", len(service_names)), service_names)))
-        argv.extend(args)
-        return argv
-
     def test_command(self):
         services = [
             ("stack_app", "repository/app_image:latest@sha256:10001"),
@@ -140,3 +132,25 @@ class CLICommandTestCase(KaptenTestCase):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
+
+    def test_command_server(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services, "--server")
+
+        with self.assertRaises(SystemExit) as cm:
+            with self.mock_stderr() as stderr:
+                cli.command(argv)
+
+        self.assertIn("Unable to start server", stderr.getvalue())
+        self.assertEqual(cm.exception.code, 2)
+
+        with mock.patch.dict(
+            "sys.modules",
+            **{
+                "uvicorn": mock.MagicMock(),
+                "starlette.applications": mock.MagicMock(),
+                "starlette.responses": mock.MagicMock(),
+            }
+        ), mock.patch("kapten.server.run") as run_mock:
+            cli.command(argv)
+            self.assertTrue(run_mock.called)

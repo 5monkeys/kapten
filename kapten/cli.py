@@ -85,7 +85,7 @@ def command(input_args=None):
     logger.setLevel(level)
 
     # Configure
-    captain = Kapten(
+    client = Kapten(
         args.services,
         project=args.project,
         slack_token=args.slack_token,
@@ -103,12 +103,12 @@ def command(input_args=None):
                 "Unable to start server, ensure starlette and uvicorn is installed"
             )
         else:
-            server.run(captain, host=args.host, port=args.port)
+            server.run(client, host=args.host, port=args.port)
 
     else:
         # Run one-off check/update
         try:
-            captain.update_services()
+            client.update_services()
         except KaptenError as e:
             logger.critical(str(e))
             exit(666)
