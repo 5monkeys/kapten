@@ -3,14 +3,8 @@ version: "3.7"
 services:
   kapten:
     image: 5monkeys/kapten:${KAPTEN_IMAGE_TAG:-latest}
-    build:
-      context: .
-      args:
-        BUILD_TARGET: dev
+    build: .
     ports:
       - 8000:8000
     volumes:
-      - ./kapten:/app/kapten
-      - ./tests:/app/tests
-      - ./setup.cfg:/app/setup.cfg
-      - ./Makefile:/app/Makefile
+      - ./kapten:/app/venv/lib/python3.8/site-packages/kapten

@@ -1,15 +1,11 @@
-MAKEFILE := $(abspath $(lastword $(MAKEFILE_LIST)))
-ROOT_DIR ?= $(patsubst %/,%,$(dir $(MAKEFILE)))
-
-
 .PHONY: test
 test:
-	python -m unittest -v
+	python setup.py test $(test)
 
 
 .PHONY: coverage
 coverage:
-	coverage run -m unittest -v
+	coverage run setup.py test
 	coverage report
 	coverage xml
 
@@ -42,13 +38,8 @@ publish: clean
 requirements:
 	pip-compile \
 		--upgrade --pre --generate-hashes \
-		--output-file $(ROOT_DIR)/reqs/requirements.txt \
-		$(ROOT_DIR)/reqs/requirements.in
-	pip-compile \
-		--upgrade --pre --generate-hashes \
-		--output-file $(ROOT_DIR)/reqs/dev-requirements.txt \
-		$(ROOT_DIR)/reqs/dev-requirements.in
+		--output-file requirements.dev.txt \
+		requirements.dev.in
 	chown \
-		--reference $(ROOT_DIR)/reqs/requirements.in \
-		$(ROOT_DIR)/reqs/requirements.txt \
-		$(ROOT_DIR)/reqs/dev-requirements.txt
+		--reference requirements.dev.in \
+		requirements.dev.txt

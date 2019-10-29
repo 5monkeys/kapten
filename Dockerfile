@@ -1,39 +1,27 @@
 ###############################################################################
 # BUILDER STEP
 ###############################################################################
-ARG BUILD_TARGET=prod
 FROM python:3.8-buster AS builder
 
 # Extra Python environment variables
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH=/app/venv/bin:$PATH
+    PATH=/app/venv/bin:$PATH \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_PIP_VERSION=19.3.1
 
 # Setup the virtualenv
 RUN python -m venv /app/venv
 WORKDIR /app
 
-# Pinned versions
-ENV PIP_NO_CACHE_DIR=1 \
-    PIP_PIP_VERSION=19.3.1 \
-    PIP_PIP_TOOLS_VERSION=4.2.0
-
-# Install Python requirements
-# hadolint ignore=DL3013
-ARG BUILD_TARGET
-COPY reqs /tmp/reqs
-RUN set -x && \
-    pip install pip==$PIP_PIP_VERSION pip-tools==$PIP_PIP_TOOLS_VERSION && \
-    pip install --require-hashes --pre -r /tmp/reqs/requirements.txt && \
-    if [ "${BUILD_TARGET}" = "dev" ] ; then \
-        pip install --require-hashes --pre -r /tmp/reqs/dev-requirements.txt ; \
-    fi && \
-    pip check
-
 # Install source code
+# hadolint ignore=DL3013
 COPY setup.py README.md ./
 COPY kapten kapten
-RUN pip install --editable .
+RUN set -x && \
+    pip install pip==$PIP_PIP_VERSION && \
+    pip install .["server"] && \
+    pip check
 
 ###############################################################################
 # RUNTIME STEP
@@ -64,7 +52,5 @@ RUN set -x && \
 USER app
 WORKDIR /app
 COPY --from=builder /app/venv venv
-COPY --from=builder /app/kapten kapten
-COPY --from=builder /app/kapten.egg-info kapten.egg-info
 
 ENTRYPOINT ["kapten"]
