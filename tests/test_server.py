@@ -14,13 +14,13 @@ from .testcases import KaptenTestCase
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None):
+        from starlette.testclient import TestClient
+        from kapten.server import app
+
         services = services or []
         with self.mock_docker_api(services=services):
             client = Kapten([name for name, _ in services])
             with mock.patch("kapten.server.app.state.client", client):
-                from starlette.testclient import TestClient
-                from kapten.server import app
-
                 test_client = TestClient(app)
                 yield test_client
 
