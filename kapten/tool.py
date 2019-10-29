@@ -28,6 +28,9 @@ class Service:
         self.digest = current_digest
         self.task_template = task_template
 
+    def __repr__(self):
+        return "<Service: {}>".format(self.name)
+
 
 class Kapten:
     def __init__(
@@ -68,7 +71,7 @@ class Kapten:
 
         # Filter by given image
         if image_name:
-            services = list(filter(lambda s: s.image_name == image_name))
+            services = list(filter(lambda s: s.image_name == image_name, services))
 
         return services
 

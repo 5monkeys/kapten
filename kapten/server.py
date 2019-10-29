@@ -1,4 +1,3 @@
-import uvicorn
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse
 
@@ -7,6 +6,7 @@ from .log import logger
 from .tool import Kapten
 
 app = Starlette(debug=True)
+app.state.client = None
 
 
 @app.route("/version")

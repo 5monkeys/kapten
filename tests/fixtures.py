@@ -1,0 +1,30 @@
+dockerhub_payload = {
+    "callback_url": "https://registry.hub.docker.com/u/5monkeys/app/hook/2141b5bi5i5b02bec211i4eeih0242eg11000a/",
+    "push_data": {
+        "images": [
+            "27d47432a69bca5f2700e4dff7de0388ed65f9d3fb1ec645e2bc24c223dc1cc3",
+            "51a9c7c1f8bb2fa19bcd09789a34e63f35abb80044bc10196e304f6634cc582c",
+            "...",
+        ],
+        "pushed_at": 1.417566161e09,
+        "pusher": "trustedbuilder",
+        "tag": "latest",
+    },
+    "repository": {
+        "comment_count": 0,
+        "date_created": 1.417494799e09,
+        "description": "",
+        "dockerfile": "FROM ...",
+        "full_description": "Docker Hub based automated build from a GitHub repo",
+        "is_official": False,
+        "is_private": True,
+        "is_trusted": True,
+        "name": "testhook",
+        "namespace": "5monkeys",
+        "owner": "5monkeys",
+        "repo_name": "5monkeys/app",
+        "repo_url": "https://registry.hub.docker.com/u/5monkeys/app/",
+        "star_count": 0,
+        "status": "Active",
+    },
+}
