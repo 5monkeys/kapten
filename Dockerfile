@@ -31,22 +31,21 @@ RUN set -x && \
     pip check
 
 # Install source code
-RUN mkdir /app/src
-WORKDIR /app/src
 COPY setup.py README.md ./
 COPY kapten kapten
-RUN pip install -e .
+RUN pip install --editable .
 
 ###############################################################################
 # RUNTIME STEP
 ###############################################################################
 FROM python:3.8-slim-buster AS runtime
 
-# Extra Python environment variables
+# Python environment settings and dpendency versions
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PATH=/app/venv/bin:$PATH \
-    XDG_CACHE_HOME=/tmp/pip/.cache
+    XDG_CACHE_HOME=/tmp/pip/.cache \
+    APT_MAKE_VERSION=4.2.1-*
 
 # Setup app user and directory
 RUN set -x && \
@@ -55,10 +54,17 @@ RUN set -x && \
     mkdir /app && \
     chown -R app:app /app
 
+# Install system dependencies
+RUN set -x && \
+    apt-get update && \
+    apt-get install --no-install-recommends -y \
+    make=$APT_MAKE_VERSION
+
 # Install source code
 USER app
 WORKDIR /app
 COPY --from=builder /app/venv venv
-COPY --from=builder /app/src src
+COPY --from=builder /app/kapten kapten
+COPY --from=builder /app/kapten.egg-info kapten.egg-info
 
 ENTRYPOINT ["kapten"]

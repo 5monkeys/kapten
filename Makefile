@@ -4,12 +4,12 @@ ROOT_DIR ?= $(patsubst %/,%,$(dir $(MAKEFILE)))
 
 .PHONY: test
 test:
-	python setup.py test
+	python -m unittest -v
 
 
 .PHONY: coverage
 coverage:
-	coverage run setup.py test
+	coverage run -m unittest -v
 	coverage report
 	coverage xml
 

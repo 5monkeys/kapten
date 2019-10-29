@@ -138,7 +138,9 @@ class CLICommandTestCase(KaptenTestCase):
         argv = self.build_sys_args(services, "--server")
 
         with self.assertRaises(SystemExit) as cm:
-            with self.mock_stderr() as stderr:
+            with mock.patch.dict(
+                "sys.modules", **{"uvicorn": None}
+            ), self.mock_stderr() as stderr:
                 cli.command(argv)
 
         self.assertIn("Unable to start server", stderr.getvalue())

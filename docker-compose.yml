@@ -10,4 +10,7 @@ services:
     ports:
       - 8000:8000
     volumes:
-      - ./kapten:/app/src/kapten
+      - ./kapten:/app/kapten
+      - ./tests:/app/tests
+      - ./setup.cfg:/app/setup.cfg
+      - ./Makefile:/app/Makefile
