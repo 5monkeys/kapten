@@ -10,7 +10,7 @@ from .fixtures import dockerhub_payload
 from .testcases import KaptenTestCase
 
 
-@unittest.skipIf(sys.version_info[:2] < (3, 7), "server mode not supported")
+@unittest.skipIf(sys.version_info[:2] < (3, 6), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None):

@@ -15,7 +15,7 @@ with codecs.open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
 tests_require = ["responses"]
-if sys.version_info[:2] >= (3, 7):
+if sys.version_info[:2] >= (3, 6):
     tests_require.append("starlette>=0.12.10,<0.13")
 
 setup(

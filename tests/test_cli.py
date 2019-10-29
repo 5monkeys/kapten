@@ -135,7 +135,7 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
 
-    @unittest.skipIf(sys.version_info[:2] < (3, 7), "server mode not supported")
+    @unittest.skipIf(sys.version_info[:2] < (3, 6), "server mode not supported")
     def test_command_server(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--server")
