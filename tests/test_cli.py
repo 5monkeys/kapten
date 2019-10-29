@@ -1,12 +1,11 @@
 import logging
-import sys
 import unittest
 from unittest import mock
 from unittest.mock import call
 
 from kapten import __version__, cli
 
-from .testcases import KaptenTestCase
+from .testcases import SUPPORTS_SERVER_MODE, KaptenTestCase
 
 
 class CLICommandTestCase(KaptenTestCase):
@@ -135,7 +134,7 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
 
-    @unittest.skipIf(sys.version_info[:2] < (3, 6), "server mode not supported")
+    @unittest.skipIf(not SUPPORTS_SERVER_MODE, "server mode not supported")
     def test_command_server(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--server")

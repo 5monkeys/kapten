@@ -1,5 +1,6 @@
 import contextlib
 import json
+import sys
 import unittest
 from io import StringIO
 from itertools import chain, repeat
@@ -7,6 +8,8 @@ from random import randint
 from unittest import mock
 
 import responses
+
+SUPPORTS_SERVER_MODE = sys.version_info[:2] >= (3, 6)
 
 
 class KaptenTestCase(unittest.TestCase):
