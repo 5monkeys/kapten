@@ -3,7 +3,10 @@ version: "3.7"
 services:
   kapten:
     image: 5monkeys/kapten:${KAPTEN_IMAGE_TAG:-latest}
-    build: .
+    build:
+      context: .
+      args:
+        BUILD_TARGET: dev
     ports:
       - 8000:8000
     volumes:

@@ -1,0 +1,4 @@
+# Server
+uvloop==0.14.0rc1
+starlette>=0.12.10,<0.13
+uvicorn>=0.9.1,<0.10
