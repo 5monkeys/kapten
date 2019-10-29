@@ -1,3 +1,5 @@
+import sys
+
 VERSION = (1, 3, 0, "final", 0)
 
 
@@ -22,6 +24,20 @@ def get_version(version=None):
         sub = mapping[version[3]] + str(version[4])
 
     return main + sub
+
+
+def supports_feature(name):
+    return name == "server" and sys.version_info[:2] >= (3, 6)
+
+
+def has_feature(name):
+    if name == "server" and supports_feature(name):  # pragma: nocover
+        try:
+            import uvicorn  # noqa
+        except ImportError:
+            return False
+        else:
+            return True
 
 
 __version__ = get_version()

@@ -3,9 +3,10 @@ import unittest
 from unittest import mock
 from unittest.mock import call
 
+import kapten
 from kapten import __version__, cli
 
-from .testcases import SUPPORTS_SERVER_MODE, KaptenTestCase
+from .testcases import KaptenTestCase
 
 
 class CLICommandTestCase(KaptenTestCase):
@@ -134,20 +135,28 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
 
-    @unittest.skipIf(not SUPPORTS_SERVER_MODE, "server mode not supported")
-    def test_command_server(self):
+    def test_command_server_not_supported(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
-        argv = self.build_sys_args(services, "--server")
-
+        argv = self.build_sys_args(
+            services, "--server", "--host", "1.2.3.4", "--port", "8888"
+        )
         with mock.patch.dict("sys.modules", uvicorn=None):
             with self.assertRaises(SystemExit) as cm:
                 with self.mock_stderr() as stderr:
                     cli.command(argv)
 
-        self.assertIn("Unable to start server", stderr.getvalue())
+        self.assertIn("unrecognized arguments: --server", stderr.getvalue())
         self.assertEqual(cm.exception.code, 2)
 
+    @unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
+    def test_command_server(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(
+            services, "--server", "--host", "1.2.3.4", "--port", "8888"
+        )
         with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
             with mock.patch("kapten.server.run") as run_mock:
                 cli.command(argv)
                 self.assertTrue(run_mock.called)
+                _, run_kwargs = run_mock.call_args_list[0]
+                self.assertDictEqual(run_kwargs, {"host": "1.2.3.4", "port": 8888})

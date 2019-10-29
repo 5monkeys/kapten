@@ -2,6 +2,8 @@ import argparse
 import logging
 import sys
 
+import kapten
+
 from . import __version__
 from .exceptions import KaptenError
 from .log import logger
@@ -30,18 +32,21 @@ def command(input_args=None):
         help="Service to update.",
     )
     parser.add_argument("-p", "--project", type=str, help="Optional project name.")
-    parser.add_argument(
-        "--server", action="store_true", help="Run kapten in server mode."
-    )
-    parser.add_argument(
-        "--host",
-        type=str,
-        default="0.0.0.0",
-        help="Kapten server host. [default: 0.0.0.0]",
-    )
-    parser.add_argument(
-        "--port", type=int, default=8000, help="Kapten server port. [default: 8000]"
-    )
+
+    if kapten.has_feature("server"):
+        parser.add_argument(
+            "--server", action="store_true", help="Run kapten in server mode."
+        )
+        parser.add_argument(
+            "--host",
+            type=str,
+            default="0.0.0.0",
+            help="Kapten server host. [default: 0.0.0.0]",
+        )
+        parser.add_argument(
+            "--port", type=int, default=8000, help="Kapten server port. [default: 8000]"
+        )
+
     parser.add_argument(
         "--slack-token", type=str, help="Slack token to use for notification."
     )
@@ -94,16 +99,11 @@ def command(input_args=None):
         force=args.force,
     )
 
-    if args.server:
+    if hasattr(args, "server") and args.server:
         # Start server
-        try:
-            from kapten import server
+        from kapten import server
 
-            server.run(client, host=args.host, port=args.port)
-        except ImportError:
-            parser.error(
-                "Unable to start server, ensure starlette and uvicorn is installed"
-            )
+        server.run(client, host=args.host, port=args.port)
 
     else:
         # Run one-off check/update

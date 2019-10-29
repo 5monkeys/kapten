@@ -2,18 +2,19 @@ import contextlib
 import unittest
 from unittest import mock
 
+import kapten
 from kapten import __version__
 from kapten.tool import Kapten
 
 from .fixtures import dockerhub_payload
-from .testcases import SUPPORTS_SERVER_MODE, KaptenTestCase
+from .testcases import KaptenTestCase
 
-if SUPPORTS_SERVER_MODE:
+if kapten.supports_feature("server"):
     from starlette.testclient import TestClient
     from kapten.server import app
 
 
-@unittest.skipIf(not SUPPORTS_SERVER_MODE, "server mode not supported")
+@unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None):

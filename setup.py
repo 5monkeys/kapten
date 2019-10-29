@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 import codecs
-import sys
 from os import path
 
 from setuptools import setup
 
 # Get version from package
-version = __import__("kapten").__version__
+kapten = __import__("kapten")
+version = kapten.__version__
 
 # Get the long description from the README
 long_description = None
@@ -14,9 +14,21 @@ here = path.dirname(path.abspath(__file__))
 with codecs.open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
+# Test requirements
 tests_require = ["responses"]
-if sys.version_info[:2] >= (3, 6):
+if kapten.supports_feature("server"):
     tests_require.append("starlette>=0.12.10,<0.13")
+
+# Server requirements
+server_requirements = (
+    [
+        "uvloop==0.14.0rc1",  # TODO: Bump when released or remove when uvicorn bumped
+        "uvicorn>=0.9.1,<0.10",
+        "starlette>=0.12.10,<0.13",
+    ]
+    if kapten.supports_feature("server")
+    else []
+)
 
 setup(
     name="kapten",
@@ -45,13 +57,7 @@ setup(
     packages=["kapten"],
     entry_points={"console_scripts": ["kapten = kapten.cli:command"]},
     install_requires=["docker"],
-    extras_require={
-        "server": [
-            "starlette>=0.12.10,<0.13",
-            "uvloop==0.14.0rc1",
-            "uvicorn>=0.9.1,<0.10",
-        ]
-    },
+    extras_require={"server": server_requirements},
     tests_require=tests_require,
     test_suite="tests",
 )
