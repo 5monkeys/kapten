@@ -98,12 +98,12 @@ def command(input_args=None):
         # Start server
         try:
             from kapten import server
+
+            server.run(client, host=args.host, port=args.port)
         except ImportError:
             parser.error(
                 "Unable to start server, ensure starlette and uvicorn is installed"
             )
-        else:
-            server.run(client, host=args.host, port=args.port)
 
     else:
         # Run one-off check/update

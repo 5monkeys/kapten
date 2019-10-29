@@ -137,22 +137,15 @@ class CLICommandTestCase(KaptenTestCase):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--server")
 
-        with self.assertRaises(SystemExit) as cm:
-            with mock.patch.dict(
-                "sys.modules", **{"uvicorn": None}
-            ), self.mock_stderr() as stderr:
-                cli.command(argv)
+        with mock.patch.dict("sys.modules", uvicorn=None):
+            with self.assertRaises(SystemExit) as cm:
+                with self.mock_stderr() as stderr:
+                    cli.command(argv)
 
         self.assertIn("Unable to start server", stderr.getvalue())
         self.assertEqual(cm.exception.code, 2)
 
-        with mock.patch.dict(
-            "sys.modules",
-            **{
-                "uvicorn": mock.MagicMock(),
-                "starlette.applications": mock.MagicMock(),
-                "starlette.responses": mock.MagicMock(),
-            }
-        ), mock.patch("kapten.server.run") as run_mock:
-            cli.command(argv)
-            self.assertTrue(run_mock.called)
+        with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
+            with mock.patch("kapten.server.run") as run_mock:
+                cli.command(argv)
+                self.assertTrue(run_mock.called)

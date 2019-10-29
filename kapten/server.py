@@ -45,6 +45,8 @@ async def dockerhub_webhook(request):
 
 
 def run(client: Kapten, host: str, port: int):
+    import uvicorn
+
     logger.info("Starting Kapten {} server ...".format(__version__))
     app.state.client = client
     uvicorn.run(app, host=host, port=port)
