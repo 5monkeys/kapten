@@ -9,14 +9,15 @@ from kapten.tool import Kapten
 from .fixtures import dockerhub_payload
 from .testcases import KaptenTestCase
 
+if sys.version_info[:2] >= (3, 6):
+    from starlette.testclient import TestClient
+    from kapten.server import app
+
 
 @unittest.skipIf(sys.version_info[:2] < (3, 6), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None):
-        from starlette.testclient import TestClient
-        from kapten.server import app
-
         services = services or []
         with self.mock_docker_api(services=services):
             client = Kapten([name for name, _ in services])
