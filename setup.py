@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import codecs
+import sys
 from os import path
 
 from setuptools import setup
@@ -12,6 +13,10 @@ long_description = None
 here = path.dirname(path.abspath(__file__))
 with codecs.open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
+
+tests_require = ["responses"]
+if sys.version_info[:2] >= (3, 7):
+    tests_require.append("starlette>=0.12.10,<0.13")
 
 setup(
     name="kapten",
@@ -47,6 +52,6 @@ setup(
             "uvicorn>=0.9.1,<0.10",
         ]
     },
-    tests_require=["responses", "starlette>=0.12.10,<0.13"],
+    tests_require=tests_require,
     test_suite="tests",
 )

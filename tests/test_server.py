@@ -1,15 +1,16 @@
 import contextlib
+import sys
+import unittest
 from unittest import mock
 
-from starlette.testclient import TestClient
-
-from kapten import __version__, server
+from kapten import __version__
 from kapten.tool import Kapten
 
 from .fixtures import dockerhub_payload
 from .testcases import KaptenTestCase
 
 
+@unittest.skipIf(sys.version_info[:2] < (3, 7), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None):
@@ -17,7 +18,10 @@ class ServerTestCase(KaptenTestCase):
         with self.mock_docker_api(services=services):
             client = Kapten([name for name, _ in services])
             with mock.patch("kapten.server.app.state.client", client):
-                test_client = TestClient(server.app)
+                from starlette.testclient import TestClient
+                from kapten.server import app
+
+                test_client = TestClient(app)
                 yield test_client
 
     def test_version_endpoint(self):
