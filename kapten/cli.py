@@ -108,6 +108,9 @@ def command(input_args=None):
         # Start server
         from kapten import server
 
+        if not args.webhook_token:
+            parser.error("Missing required argument WEBHOOK_TOKEN")
+
         server.run(client, token=args.webhook_token, host=args.host, port=args.port)
 
     else:

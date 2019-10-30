@@ -100,7 +100,7 @@ class CLICommandTestCase(KaptenTestCase):
         with self.assertRaises(SystemExit) as cm:
             with self.mock_stderr() as stderr:
                 cli.command([])
-        self.assertIn("Missing required", stderr.getvalue())
+        self.assertIn("SERVICES", stderr.getvalue())
         self.assertEqual(cm.exception.code, 2)
 
     def test_command_version(self):
@@ -159,7 +159,13 @@ class CLICommandTestCase(KaptenTestCase):
         uvicorn = mock.MagicMock()
         with mock.patch.dict("sys.modules", uvicorn=uvicorn):
             with self.mock_docker_api(services):
-                cli.command(argv)
+                with self.assertRaises(SystemExit) as cm:
+                    with self.mock_stderr() as stderr:
+                        cli.command(argv)
+                self.assertIn("WEBHOOK_TOKEN", stderr.getvalue())
+                self.assertEqual(cm.exception.code, 2)
+
+                cli.command(argv + ["--webhook-token", "my-secret-token"])
                 self.assertTrue(uvicorn.run.called)
                 self.assertEqual(
                     uvicorn.run.mock_calls[0], call(app, host="1.2.3.4", port=8888)
