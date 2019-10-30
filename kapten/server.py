@@ -35,16 +35,13 @@ async def dockerhub_webhook(request):
 
     repository = payload["repository"]["repo_name"]
     tag = payload["push_data"]["tag"]
-    image_name = "{}:{}".format(repository, tag)
+    image = "{}:{}".format(repository, tag)
 
     # Update services matching this image:tag
-    updated_services = app.state.client.update_services(image_name=image_name)
+    updated_services = app.state.client.update_services(image=image)
 
     return JSONResponse(
-        [
-            {"service": service_name, "image": image}
-            for service_name, image in updated_services.items()
-        ]
+        [{"service": name, "image": image} for name, image in updated_services.items()]
     )
 
 

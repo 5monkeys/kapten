@@ -1,3 +1,5 @@
+import copy
+
 from docker.api import APIClient
 
 from . import slack
@@ -5,32 +7,59 @@ from .exceptions import KaptenError
 from .log import logger
 
 
-# TODO: Extend dict
-class Service:
-    def __init__(self, spec):
-        task_template = spec["Spec"]["TaskTemplate"]
-        container_spec = task_template["ContainerSpec"]
-        container_image = container_spec["Image"]
-        image_name, _, current_digest = container_image.partition("@")
-        repository, _, tag = image_name.partition(":")
+class Service(dict):
+    @property
+    def id(self):
+        return self["ID"]
 
-        self.id = spec["ID"]
-        self.version = spec["Version"]["Index"]
-        self.stack = container_spec["Labels"].get("com.docker.stack.namespace", None)
-        self.name = spec["Spec"]["Name"]
-        self.short_name = (
-            self.name[len(self.stack) + 1 :]
-            if self.name.startswith(self.stack + "_")
-            else self.name
-        )
-        self.repository = repository
-        self.image_name = image_name  # TODO: Remove in favour of repository and tag?
-        self.tag = tag
-        self.digest = current_digest
-        self.task_template = task_template
+    @property
+    def version(self):
+        return self["Version"]["Index"]
 
-    def __repr__(self):
-        return "<Service: {}>".format(self.name)
+    @property
+    def stack(self):
+        labels = self["Spec"]["TaskTemplate"]["ContainerSpec"]["Labels"]
+        return labels.get("com.docker.stack.namespace")
+
+    @property
+    def name(self):
+        return self["Spec"]["Name"]
+
+    @property
+    def short_name(self):
+        name = self.name
+        stack = self.stack
+        return name[len(stack) + 1 :] if name.startswith(stack + "_") else name
+
+    @property
+    def image_with_digest(self):
+        return self["Spec"]["TaskTemplate"]["ContainerSpec"]["Image"]
+
+    @property
+    def image(self):
+        image = self.image_with_digest
+        return image[: image.rindex("@")]
+
+    @property
+    def digest(self):
+        digest = self.image_with_digest
+        return digest[digest.rindex("@") + 1 :]
+
+    # @property
+    # def repository(self):
+    # repository = self.image
+    # return repository[: repository.index(":")]
+
+    # @property
+    # def tag(self):
+    # image = self.image
+    # return image[image.index(":") + 1 :]
+
+    def clone(self, digest):
+        clone = copy.deepcopy(self)
+        task_template = clone["Spec"]["TaskTemplate"]
+        task_template["ContainerSpec"]["Image"] = "{}@{}".format(self.image, digest)
+        return clone
 
 
 class Kapten:
@@ -51,16 +80,14 @@ class Kapten:
         self.force = force
         self.client = APIClient()
 
-    def get_latest_digest(self, image_name):
-        data = self.client.inspect_distribution(image_name)
+    def get_latest_digest(self, image):
+        data = self.client.inspect_distribution(image)
         digest = data.get("Descriptor", {}).get("digest")
         if not digest:
-            raise KaptenError(
-                "Failed to get latest digest for image: {}".format(image_name)
-            )
+            raise KaptenError("Failed to get latest digest for image: {}".format(image))
         return digest
 
-    def list_services(self, image_name=None):
+    def list_services(self, image=None):
         service_specs = self.client.services({"name": self.service_names})
 
         # Sort specs in input order and filter out any non exact matches
@@ -75,36 +102,41 @@ class Kapten:
         services = [Service(spec) for spec in service_specs]
 
         # Filter by given image
-        if image_name:
-            services = list(filter(lambda s: s.image_name == image_name, services))
+        if image:
+            services = list(filter(lambda s: s.image == image, services))
 
         return services
 
     def update_service(self, service, digest):
-        latest_image = "{}@{}".format(service.image_name, digest)
-
         logger.debug("Stack:     %s", service.stack or "-")
         logger.debug("Service:   %s", service.short_name)
-        logger.debug("Image:     %s", service.image_name)
+        logger.debug("Image:     %s", service.image)
         logger.debug("  Current: %s", service.digest)
         logger.debug("  Latest:  %s", digest)
 
         if not self.force and digest == service.digest:
             return
 
+        # Clone service spec with new image digest
+        new_service = service.clone(digest)
+
         if self.only_check:
-            logger.info("Can update service %s to %s", service.name, latest_image)
-            return
+            logger.info(
+                "Can update service %s to %s",
+                service.name,
+                new_service.image_with_digest,
+            )
+            return new_service
 
-        logger.info("Updating service %s to %s", service.name, latest_image)
+        logger.info(
+            "Updating service %s to %s", service.name, new_service.image_with_digest
+        )
 
-        # Update service to latest image
-        task_template = service.task_template
-        task_template["ContainerSpec"]["Image"] = latest_image
+        # Update service to latest image digest
         self.client.update_service(
             service.id,
             service.version,
-            task_template=task_template,
+            task_template=new_service["Spec"]["TaskTemplate"],
             fetch_current_spec=True,
         )
 
@@ -118,23 +150,24 @@ class Kapten:
                 project=self.project,
                 stack=service.stack,
                 service_short_name=service.short_name,
-                image_name=service.image_name,
+                image=service.image,
             )
 
-        return latest_image
+        return new_service
 
-    def update_services(self, services=None, image_name=None):
+    def update_services(self, services=None, image=None):
         result = {}
 
-        services = services or self.list_services(image_name=image_name)
-        image_digests = {
-            image_name: self.get_latest_digest(image_name)
-            for image_name in {service.image_name for service in services}
+        services = services or self.list_services(image=image)
+        images = {
+            image: self.get_latest_digest(image)
+            for image in {service.image for service in services}
         }
 
         for service in services:
-            digest = image_digests[service.image_name]
-            image = self.update_service(service, digest=digest)
-            result[service.name] = image
+            digest = images[service.image]
+            updated_service = self.update_service(service, digest=digest)
+            if updated_service:
+                result[service.name] = updated_service.image_with_digest
 
         return result
