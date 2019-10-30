@@ -8,11 +8,17 @@ from unittest import mock
 
 import responses
 
+import kapten
+
 
 class KaptenTestCase(unittest.TestCase):
     def setUp(self):
+        # Mock logger
         self.logger_mock = mock.MagicMock()
-        for module in ["cli", "tool", "slack", "server"]:
+        modules = ["cli", "tool", "slack"]
+        if kapten.supports_feature("server"):
+            modules.append("server")
+        for module in modules:
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
