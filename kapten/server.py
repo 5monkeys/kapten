@@ -1,11 +1,14 @@
 from starlette.applications import Starlette
+from starlette.config import Config
 from starlette.responses import JSONResponse, Response
 
 from . import __version__, dockerhub
 from .log import logger
 from .tool import Kapten
 
-app = Starlette(debug=True)
+config = Config()
+app = Starlette()
+app.debug = config("KAPTEN_DEBUG", cast=bool, default=False)
 
 
 @app.route("/version")
