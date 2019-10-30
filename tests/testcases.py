@@ -45,6 +45,7 @@ class KaptenTestCase(unittest.TestCase):
         services=None,
         service_failure=False,
         registry_failure=False,
+        docker_api_error=False,
         with_new_digest=True,
     ):
         with mock.patch("kapten.tool.APIClient") as APIClient:
@@ -75,6 +76,10 @@ class KaptenTestCase(unittest.TestCase):
             client.inspect_distribution = mock.MagicMock(
                 side_effect=inspect_distribution_mock
             )
+
+            if docker_api_error:
+                exception = Exception("Mock Docker API Error")
+                client.update_service.side_effect = exception
 
             yield client
 

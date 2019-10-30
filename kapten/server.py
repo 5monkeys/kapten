@@ -1,7 +1,7 @@
 from starlette.applications import Starlette
 from starlette.responses import JSONResponse, Response
 
-from . import __version__
+from . import __version__, dockerhub
 from .log import logger
 from .tool import Kapten
 
@@ -16,44 +16,36 @@ async def version(request):
 @app.route("/webhook/dockerhub", methods=["POST"])
 async def dockerhub_webhook(request):
     payload = await request.json()
+    repositories = app.state.repositories
 
-    # Validate payload schema
-    if (
-        "callback_url" not in payload
-        or "repository" not in payload
-        or "repo_name" not in payload["repository"]
-        or "push_data" not in payload
-        or "tag" not in payload["push_data"]
-    ):
-        logger.critical("Invalid dockerhub payload")
+    try:
+        image, callback_url = dockerhub.parse_webhook_payload(payload, repositories)
+    except ValueError as e:
+        logger.critical(e)
         return Response(status_code=404)
 
-    # Validate callback url
-    callback_url = payload["callback_url"]
-    hooks = (
-        "https://registry.hub.docker.com/u/{}/hook/".format(repository)
-        for repository in app.state.repositories
-    )
-    if not callback_url or not any((callback_url.startswith(hook) for hook in hooks)):
-        logger.critical("Invalid dockerhub callback url: %s", callback_url)
-        return Response(status_code=404)
-
-    # TODO: Ack callback url
-
-    # Validate repository
-    repository = payload["repository"]["repo_name"]
-    if repository not in app.state.repositories:
-        logger.critical("Invalid dockerhub repository: %s", repository)
+    # Callback and verify
+    acked = dockerhub.callback(callback_url, "Valid webhook received")
+    if not acked:
+        logger.critical("Failed to call back to dockerhub", callback_url)
         return Response(status_code=400)
 
-    # Update all services matching this image
-    tag = payload["push_data"]["tag"]
-    image = "{}:{}".format(repository, tag)
-    updated_services = app.state.client.update_services(image=image)
+    try:
+        # Update all services matching this image
+        updated_services = app.state.client.update_services(image=image)
+    except Exception as e:
+        logger.error(e)
+        return Response(status_code=500)
 
     if not updated_services:
         logger.error("No services updated by dockerhub webhook for image: %s", image)
+        dockerhub.callback(callback_url, "Non-tracked image", state="failure")
         return Response(None, status_code=400)
+
+    dockerhub.callback(
+        callback_url,
+        "Updated services: [{}]".format(", ".join((s.name for s in updated_services))),
+    )
 
     return JSONResponse(
         [
@@ -66,8 +58,8 @@ async def dockerhub_webhook(request):
 def run(client: Kapten, host: str = "0.0.0.0", port: int = 8000):
     import uvicorn
 
+    logger.info("Starting Kapten {} server ...".format(__version__))
     app.state.client = client
     app.state.repositories = client.list_repositories()
 
-    logger.info("Starting Kapten {} server ...".format(__version__))
     uvicorn.run(app, host=host, port=port)
