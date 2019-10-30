@@ -45,10 +45,10 @@ class Service(dict):
         digest = self.image_with_digest
         return digest[digest.rindex("@") + 1 :]
 
-    # @property
-    # def repository(self):
-    # repository = self.image
-    # return repository[: repository.index(":")]
+    @property
+    def repository(self):
+        repository = self.image
+        return repository[: repository.index(":")]
 
     # @property
     # def tag(self):
@@ -107,6 +107,11 @@ class Kapten:
 
         return services
 
+    def list_repositories(self):
+        services = self.list_services()
+        repositories = {service.repository for service in services}
+        return sorted(repositories)
+
     def update_service(self, service, digest):
         logger.debug("Stack:     %s", service.stack or "-")
         logger.debug("Service:   %s", service.short_name)
@@ -156,7 +161,7 @@ class Kapten:
         return new_service
 
     def update_services(self, services=None, image=None):
-        result = {}
+        updated_services = []
 
         services = services or self.list_services(image=image)
         images = {
@@ -168,6 +173,6 @@ class Kapten:
             digest = images[service.image]
             updated_service = self.update_service(service, digest=digest)
             if updated_service:
-                result[service.name] = updated_service.image_with_digest
+                updated_services.append(updated_service)
 
-        return result
+        return updated_services

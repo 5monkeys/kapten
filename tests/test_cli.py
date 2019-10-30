@@ -5,6 +5,7 @@ from unittest.mock import call
 
 import kapten
 from kapten import __version__, cli
+from kapten.server import app
 
 from .testcases import KaptenTestCase
 
@@ -154,9 +155,11 @@ class CLICommandTestCase(KaptenTestCase):
         argv = self.build_sys_args(
             services, "--server", "--host", "1.2.3.4", "--port", "8888"
         )
-        with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
-            with mock.patch("kapten.server.run") as run_mock:
+        uvicorn = mock.MagicMock()
+        with mock.patch.dict("sys.modules", uvicorn=uvicorn):
+            with self.mock_docker_api(services):
                 cli.command(argv)
-                self.assertTrue(run_mock.called)
-                _, run_kwargs = run_mock.call_args_list[0]
-                self.assertDictEqual(run_kwargs, {"host": "1.2.3.4", "port": 8888})
+                self.assertTrue(uvicorn.run.called)
+                self.assertEqual(
+                    uvicorn.run.mock_calls[0], call(app, host="1.2.3.4", port=8888)
+                )

@@ -12,7 +12,7 @@ import responses
 class KaptenTestCase(unittest.TestCase):
     def setUp(self):
         self.logger_mock = mock.MagicMock()
-        for module in ["cli", "tool", "slack"]:
+        for module in ["cli", "tool", "slack", "server"]:
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
