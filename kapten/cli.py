@@ -46,6 +46,11 @@ def command(input_args=None):
         parser.add_argument(
             "--port", type=int, default=8000, help="Kapten server port. [default: 8000]"
         )
+        parser.add_argument(
+            "--webhook-token",
+            type=str,
+            help="Server token to use for webhook endpoints.",
+        )
 
     parser.add_argument(
         "--slack-token", type=str, help="Slack token to use for notification."
@@ -103,7 +108,7 @@ def command(input_args=None):
         # Start server
         from kapten import server
 
-        server.run(client, host=args.host, port=args.port)
+        server.run(client, token=args.webhook_token, host=args.host, port=args.port)
 
     else:
         # Run one-off check/update

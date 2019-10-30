@@ -23,7 +23,7 @@ class ServerTestCase(KaptenTestCase):
         with self.mock_docker_api(services=services, **kwargs):
             with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
                 client = Kapten([name for name, _ in services])
-                server.run(client)
+                server.run(client, "MY-TOKEN")
                 test_client = TestClient(server.app)
                 yield test_client
 
@@ -97,7 +97,7 @@ class ServerTestCase(KaptenTestCase):
         ]
         with self.mock_server(services) as client:
             with self.mock_dockerhub() as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 200)
                 self.assertListEqual(
                     response.json(),
@@ -113,11 +113,16 @@ class ServerTestCase(KaptenTestCase):
                     ],
                 )
 
+    def test_dockerhub_endpoint_with_bad_token(self):
+        with self.mock_server() as client:
+            response = client.post("/webhook/dockerhub/INVALID", json={})
+            self.assertEqual(response.status_code, 404)
+
     def test_dockerhub_endpoint_with_bad_payload(self):
         services = [("app", "5monkeys/app:latest@sha256:10001")]
         with self.mock_server(services) as client:
             payload = {"foo": "bar"}
-            response = client.post("/webhook/dockerhub", json=payload)
+            response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
             self.assertEqual(response.status_code, 404)
 
     def test_dockerhub_endpoint_with_invalid_callback_url(self):
@@ -128,7 +133,7 @@ class ServerTestCase(KaptenTestCase):
                 repository_name="5monkeys/app",
                 assert_callback=False,
             ) as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 404)
 
     def test_dockerhub_endpoint_with_invalid_repository(self):
@@ -137,26 +142,26 @@ class ServerTestCase(KaptenTestCase):
             with self.mock_dockerhub(
                 repository_name="not/me", assert_callback=False
             ) as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 404)
 
     def test_dockerhub_endpoint_with_failing_callback(self):
         services = [("app", "5monkeys/app:latest@sha256:10001")]
         with self.mock_server(services) as client:
             with self.mock_dockerhub(callback_failure=True) as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 400)
 
     def test_dockerhub_endpoint_with_non_matching_services(self):
         services = [("app", "5monkeys/app:latest@sha256:10001")]
         with self.mock_server(services, with_new_digest=False) as client:
             with self.mock_dockerhub(tag="dev") as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 400)
 
     def test_dockerhub_endpoint_with_client_error(self):
         services = [("app", "5monkeys/app:latest@sha256:10001")]
         with self.mock_server(services, docker_api_error=True) as client:
             with self.mock_dockerhub() as payload:
-                response = client.post("/webhook/dockerhub", json=payload)
+                response = client.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 500)
