@@ -5,7 +5,6 @@ from unittest.mock import call
 
 import kapten
 from kapten import __version__, cli
-from kapten.server import app
 
 from .testcases import KaptenTestCase
 
@@ -151,6 +150,8 @@ class CLICommandTestCase(KaptenTestCase):
 
     @unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
     def test_command_server(self):
+        from kapten.server import app
+
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(
             services, "--server", "--host", "1.2.3.4", "--port", "8888"

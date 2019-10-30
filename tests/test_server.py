@@ -10,7 +10,6 @@ from .testcases import KaptenTestCase
 
 if kapten.supports_feature("server"):
     from starlette.testclient import TestClient
-    from kapten.server import app
     from kapten import server
 
 
@@ -23,7 +22,7 @@ class ServerTestCase(KaptenTestCase):
             with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
                 client = Kapten([name for name, _ in services])
                 server.run(client)
-                test_client = TestClient(app)
+                test_client = TestClient(server.app)
                 yield test_client
 
     def get_dockerhub_payload(
