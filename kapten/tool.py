@@ -53,7 +53,11 @@ class Kapten:
 
     def get_latest_digest(self, image_name):
         data = self.client.inspect_distribution(image_name)
-        digest = data["Descriptor"]["digest"]
+        digest = data.get("Descriptor", {}).get("digest")
+        if not digest:
+            raise KaptenError(
+                "Failed to get latest digest for image: {}".format(image_name)
+            )
         return digest
 
     def list_services(self, image_name=None):
@@ -76,18 +80,16 @@ class Kapten:
 
         return services
 
-    def update_service(self, service, digest=None):
-        # Fetch latest image digest
-        latest_digest = digest or self.get_latest_digest(service.image_name)
-        latest_image = "{}@{}".format(service.image_name, latest_digest)
+    def update_service(self, service, digest):
+        latest_image = "{}@{}".format(service.image_name, digest)
 
         logger.debug("Stack:     %s", service.stack or "-")
         logger.debug("Service:   %s", service.short_name)
         logger.debug("Image:     %s", service.image_name)
         logger.debug("  Current: %s", service.digest)
-        logger.debug("  Latest:  %s", latest_digest)
+        logger.debug("  Latest:  %s", digest)
 
-        if not self.force and latest_digest == service.digest:
+        if not self.force and digest == service.digest:
             return
 
         if self.only_check:
@@ -111,7 +113,7 @@ class Kapten:
             slack.notify(
                 self.slack_token,
                 service.name,
-                latest_digest,
+                digest,
                 channel=self.slack_channel,
                 project=self.project,
                 stack=service.stack,
@@ -121,15 +123,18 @@ class Kapten:
 
         return latest_image
 
-    def update_services(self, services=None):
+    def update_services(self, services=None, image_name=None):
         result = {}
-        services = services or self.list_services()
+
+        services = services or self.list_services(image_name=image_name)
+        image_digests = {
+            image_name: self.get_latest_digest(image_name)
+            for image_name in {service.image_name for service in services}
+        }
+
         for service in services:
-            try:
-                image = self.update_service(service)
-                result[service.name] = image
-            except Exception as e:
-                raise KaptenError(
-                    "Failed to update service {}: {}".format(service.name, str(e))
-                )
+            digest = image_digests[service.image_name]
+            image = self.update_service(service, digest=digest)
+            result[service.name] = image
+
         return result

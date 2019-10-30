@@ -41,11 +41,16 @@ class ServerTestCase(KaptenTestCase):
         with self.mock_server(services) as client:
             response = client.post("/webhook/dockerhub", json=dockerhub_payload)
             self.assertEqual(response.status_code, 200)
-            self.assertDictEqual(
+            self.assertListEqual(
                 response.json(),
-                {
-                    "services": ["stack_migrate", "stack_app"],
-                    "image": "5monkeys/app:latest",
-                    "digest": "sha256:10002",
-                },
+                [
+                    {
+                        "service": "stack_migrate",
+                        "image": "5monkeys/app:latest@sha256:10002",
+                    },
+                    {
+                        "service": "stack_app",
+                        "image": "5monkeys/app:latest@sha256:10002",
+                    },
+                ],
             )
