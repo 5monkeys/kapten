@@ -28,6 +28,7 @@ async def dockerhub_webhook(request):
 
     callback_url = payload["callback_url"]
     if not callback_url.startswith("https://registry.hub.docker.com/u/"):
+        # TODO: Return bad request
         raise ValueError()
 
     # TODO: Ack callback url
@@ -36,11 +37,19 @@ async def dockerhub_webhook(request):
     tag = payload["push_data"]["tag"]
     image_name = "{}:{}".format(repository, tag)
 
-    services = app.state.client.list_services(image_name)
-    app.state.client.update_services(services)
+    client = app.state.client
+    services = client.list_services(image_name)
+    latest_digest = client.get_latest_digest(image_name)
+
+    updated_services = []
+    for service in services:
+        client.update_service(service)
+        updated_services.append(service.name)
+
+    # result = app.state.client.update_services(services)
 
     return JSONResponse(
-        {"services": [service.name for service in services], "image": image_name}
+        {"services": updated_services, "image": image_name, "digest": latest_digest}
     )
 
 

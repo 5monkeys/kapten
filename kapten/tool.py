@@ -5,6 +5,7 @@ from .exceptions import KaptenError
 from .log import logger
 
 
+# TODO: Extend dict
 class Service:
     def __init__(self, spec):
         task_template = spec["Spec"]["TaskTemplate"]
@@ -75,9 +76,9 @@ class Kapten:
 
         return services
 
-    def update_service(self, service):
+    def update_service(self, service, digest=None):
         # Fetch latest image digest
-        latest_digest = self.get_latest_digest(service.image_name)
+        latest_digest = digest or self.get_latest_digest(service.image_name)
         latest_image = "{}@{}".format(service.image_name, latest_digest)
 
         logger.debug("Stack:     %s", service.stack or "-")
@@ -86,42 +87,49 @@ class Kapten:
         logger.debug("  Current: %s", service.digest)
         logger.debug("  Latest:  %s", latest_digest)
 
-        if self.force or latest_digest != service.digest:
-            if self.only_check:
-                logger.info("Can update service %s to %s", service.name, latest_image)
-                return
+        if not self.force and latest_digest == service.digest:
+            return
 
-            logger.info("Updating service %s to %s", service.name, latest_image)
+        if self.only_check:
+            logger.info("Can update service %s to %s", service.name, latest_image)
+            return
 
-            # Update service to latest image
-            task_template = service.task_template
-            task_template["ContainerSpec"]["Image"] = latest_image
-            self.client.update_service(
-                service.id,
-                service.version,
-                task_template=task_template,
-                fetch_current_spec=True,
+        logger.info("Updating service %s to %s", service.name, latest_image)
+
+        # Update service to latest image
+        task_template = service.task_template
+        task_template["ContainerSpec"]["Image"] = latest_image
+        self.client.update_service(
+            service.id,
+            service.version,
+            task_template=task_template,
+            fetch_current_spec=True,
+        )
+
+        # Notify slack
+        if self.slack_token:
+            slack.notify(
+                self.slack_token,
+                service.name,
+                latest_digest,
+                channel=self.slack_channel,
+                project=self.project,
+                stack=service.stack,
+                service_short_name=service.short_name,
+                image_name=service.image_name,
             )
 
-            # Notify slack
-            if self.slack_token:
-                slack.notify(
-                    self.slack_token,
-                    service.name,
-                    latest_digest,
-                    channel=self.slack_channel,
-                    project=self.project,
-                    stack=service.stack,
-                    service_short_name=service.short_name,
-                    image_name=service.image_name,
-                )
+        return latest_image
 
     def update_services(self, services=None):
+        result = {}
         services = services or self.list_services()
         for service in services:
             try:
-                self.update_service(service)
+                image = self.update_service(service)
+                result[service.name] = image
             except Exception as e:
                 raise KaptenError(
                     "Failed to update service {}: {}".format(service.name, str(e))
                 )
+        return result

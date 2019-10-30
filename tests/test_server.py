@@ -32,11 +32,20 @@ class ServerTestCase(KaptenTestCase):
             self.assertDictEqual(response.json(), {"kapten": __version__})
 
     def test_dockerhub_endpoint(self):
-        services = [("stack_app", "5monkeys/app:latest@sha256:10001")]
+        services = [
+            ("stack_migrate", "5monkeys/app:latest@sha256:10001"),
+            ("stack_app", "5monkeys/app:latest@sha256:10001"),
+            ("stack_beta", "5monkeys/app:beta@sha256:20001"),
+            ("stack_db", "5monkeys/db:latest@sha256:30001"),
+        ]
         with self.mock_server(services) as client:
             response = client.post("/webhook/dockerhub", json=dockerhub_payload)
             self.assertEqual(response.status_code, 200)
             self.assertDictEqual(
                 response.json(),
-                {"image": "5monkeys/app:latest", "services": ["stack_app"]},
+                {
+                    "services": ["stack_migrate", "stack_app"],
+                    "image": "5monkeys/app:latest",
+                    "digest": "sha256:10002",
+                },
             )
