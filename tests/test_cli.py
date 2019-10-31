@@ -3,6 +3,9 @@ import unittest
 from unittest import mock
 from unittest.mock import call
 
+from docker.errors import APIError
+from requests.exceptions import ConnectionError
+
 import kapten
 from kapten import __version__, cli
 
@@ -73,14 +76,14 @@ class CLICommandTestCase(KaptenTestCase):
     def test_command_noop(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
-        with self.mock_docker_api(services, with_new_digest=False) as client:
+        with self.mock_docker_api(services, with_new_distribution=False) as client:
             cli.command(argv)
             self.assertFalse(client.update_service.called)
 
     def test_command_force(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--force")
-        with self.mock_docker_api(services, with_new_digest=False) as client:
+        with self.mock_docker_api(services, with_new_distribution=False) as client:
             cli.command(argv)
             self.assertTrue(client.update_service.called)
 
@@ -118,7 +121,7 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, service_failure=True):
+        with self.mock_docker_api(services, with_missing_services=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
@@ -130,7 +133,21 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, registry_failure=True):
+        with self.mock_docker_api(services, with_missing_distribution=True):
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
+    def test_command_docker_api_error(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services)
+        with self.mock_docker_api(services) as api:
+            api.services.side_effect = ConnectionError("Mocked Docker Connection Error")
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
+            api.services.side_effect = APIError("Mocked Docker API Error")
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)

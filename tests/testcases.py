@@ -49,10 +49,9 @@ class KaptenTestCase(unittest.TestCase):
     def mock_docker_api(
         self,
         services=None,
-        service_failure=False,
-        registry_failure=False,
-        docker_api_error=False,
-        with_new_digest=True,
+        with_missing_services=False,
+        with_missing_distribution=False,
+        with_new_distribution=True,
     ):
         with mock.patch("kapten.tool.APIClient") as APIClient:
             # Client instance
@@ -64,7 +63,7 @@ class KaptenTestCase(unittest.TestCase):
                     self.build_service_spec(service_name, image_name)
                     for service_name, image_name in reversed(services)
                 ]
-                if not service_failure
+                if not with_missing_services
                 else []
             )
             client.services = mock.MagicMock(return_value=specs)
@@ -73,19 +72,15 @@ class KaptenTestCase(unittest.TestCase):
             def inspect_distribution_mock(image_name):
                 image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
-                if with_new_digest:
+                if with_new_distribution:
                     digest = str(int(digest) + 1)
-                if registry_failure:
+                if with_missing_distribution:
                     return {}
                 return {"Descriptor": {"digest": "sha256:" + digest}}
 
             client.inspect_distribution = mock.MagicMock(
                 side_effect=inspect_distribution_mock
             )
-
-            if docker_api_error:
-                exception = Exception("Mock Docker API Error")
-                client.update_service.side_effect = exception
 
             yield client
 

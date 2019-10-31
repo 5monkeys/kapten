@@ -104,19 +104,20 @@ def command(input_args=None):
         force=args.force,
     )
 
-    if hasattr(args, "server") and args.server:
-        # Start server
-        from kapten import server
+    try:
+        if hasattr(args, "server") and args.server:
+            # Start server
+            from kapten import server
 
-        if not args.webhook_token:
-            parser.error("Missing required argument WEBHOOK_TOKEN")
+            if not args.webhook_token:
+                parser.error("Missing required argument WEBHOOK_TOKEN")
 
-        server.run(client, token=args.webhook_token, host=args.host, port=args.port)
+            server.run(client, token=args.webhook_token, host=args.host, port=args.port)
 
-    else:
-        # Run one-off check/update
-        try:
+        else:
+            # Run one-off check/update
             client.update_services()
-        except KaptenError as e:
-            logger.critical(str(e))
-            exit(666)
+
+    except KaptenError as e:
+        logger.critical(str(e))
+        exit(666)

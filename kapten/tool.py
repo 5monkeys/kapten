@@ -1,9 +1,12 @@
 import copy
+import os
 
 from docker.api import APIClient
+from docker.errors import APIError
+from requests.exceptions import ConnectionError
 
 from . import slack
-from .exceptions import KaptenError
+from .exceptions import KaptenClientError, KaptenError
 from .log import logger
 
 
@@ -78,7 +81,7 @@ class Kapten:
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
-        self.client = APIClient()
+        self.client = APIClient(base_url=os.environ.get("DOCKER_HOST"))
 
     def get_latest_digest(self, image):
         data = self.client.inspect_distribution(image)
@@ -88,7 +91,12 @@ class Kapten:
         return digest
 
     def list_services(self, image=None):
-        service_specs = self.client.services({"name": self.service_names})
+        try:
+            service_specs = self.client.services({"name": self.service_names})
+        except ConnectionError as e:
+            raise KaptenClientError("Docker API Failure: {}".format(str(e)))
+        except APIError as e:
+            raise KaptenClientError("Docker API Error: {}".format(str(e)))
 
         # Sort specs in input order and filter out any non exact matches
         service_specs = sorted(
