@@ -84,10 +84,21 @@ class Kapten:
         self.client = APIClient(base_url=os.environ.get("DOCKER_HOST"))
 
     def get_latest_digest(self, image):
-        data = self.client.inspect_distribution(image)
+        # Override auth config if environment variables present
+        auth_config = None
+        username = os.environ.get("DOCKER_USERNAME")
+        password = os.environ.get("DOCKER_PASSWORD")
+        if username and password:
+            auth_config = {"username": username, "password": password}
+
+        # Inspect repository image
+        data = self.client.inspect_distribution(image, auth_config=auth_config)
+
+        # Locate latest digest
         digest = data.get("Descriptor", {}).get("digest")
         if not digest:
             raise KaptenError("Failed to get latest digest for image: {}".format(image))
+
         return digest
 
     def list_services(self, image=None):
