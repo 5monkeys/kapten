@@ -5,7 +5,7 @@ services:
     image: 5monkeys/kapten:${KAPTEN_IMAGE_TAG:-latest}
     build: .
     ports:
-      - 8000:8000
+      - 8800:8800
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./kapten:/app/venv/lib/python3.8/site-packages/kapten

@@ -53,4 +53,6 @@ USER app
 WORKDIR /app
 COPY --from=builder /app/venv venv
 
+EXPOSE 8800
+
 ENTRYPOINT ["kapten"]

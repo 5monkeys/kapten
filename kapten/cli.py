@@ -44,7 +44,7 @@ def command(input_args=None):
             help="Kapten server host. [default: 0.0.0.0]",
         )
         parser.add_argument(
-            "--port", type=int, default=8000, help="Kapten server port. [default: 8000]"
+            "--port", type=int, default=8800, help="Kapten server port. [default: 8800]"
         )
         parser.add_argument(
             "--webhook-token",
