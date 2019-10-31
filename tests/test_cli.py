@@ -185,5 +185,6 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(argv + ["--webhook-token", "my-secret-token"])
                 self.assertTrue(uvicorn.run.called)
                 self.assertEqual(
-                    uvicorn.run.mock_calls[0], call(app, host="1.2.3.4", port=8888)
+                    uvicorn.run.mock_calls[0],
+                    call(app, host="1.2.3.4", port=8888, proxy_headers=True),
                 )

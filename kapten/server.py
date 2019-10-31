@@ -19,6 +19,8 @@ async def version(request):
 
 @app.route("/webhook/dockerhub/{token}", methods=["POST"])
 async def dockerhub_webhook(request):
+    logger.info("Received dockerhub webhook from: %s", request.client.host)
+
     # Validate token
     if request.path_params["token"] != str(app.state.token):
         logger.critical("Invalid dockerhub token")
@@ -47,6 +49,9 @@ async def dockerhub_webhook(request):
         logger.error(e)
         return Response(status_code=500)
 
+    if not updated_services:
+        logger.debug("No service(s) updated for image: %s", image)
+
     return JSONResponse(
         [
             {"service": service.name, "image": service.image_with_digest}
@@ -63,4 +68,4 @@ def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8000):
     app.state.token = Secret(token)
     app.state.repositories = client.list_repositories()
 
-    uvicorn.run(app, host=host, port=port)
+    uvicorn.run(app, host=host, port=port, proxy_headers=True)
