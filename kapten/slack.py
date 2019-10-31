@@ -36,8 +36,8 @@ def notify(token, service_name, image_digest, channel=None, **kwargs):
         fields.append({"title": "Stack", "value": kwargs["stack"], "short": True})
 
     # Image:
-    if "image_name" in kwargs:
-        fields.append({"title": "Image", "value": kwargs["image_name"], "short": True})
+    if "image" in kwargs:
+        fields.append({"title": "Image", "value": kwargs["image"], "short": True})
 
     # Service:
     fields.append(
