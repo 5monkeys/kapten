@@ -37,10 +37,10 @@ ENV PYTHONUNBUFFERED=1 \
 
 # Setup app user and directory
 RUN set -x && \
-    groupadd -g 8000 app && \
-    useradd -r -u 8000 -g app app && \
+    groupadd -g 8000 kapten && \
+    useradd -r -u 8000 -g kapten kapten && \
     mkdir /app && \
-    chown -R app:app /app
+    chown -R kapten:kapten /app
 
 # Install system dependencies
 RUN set -x && \
@@ -49,7 +49,7 @@ RUN set -x && \
     make=$APT_MAKE_VERSION
 
 # Install source code
-USER app
+USER kapten
 WORKDIR /app
 COPY --from=builder /app/venv venv
 
