@@ -27,34 +27,25 @@ async def dockerhub_webhook(request):
     payload = await request.json()
     repositories = app.state.repositories
 
+    # Parse payload
     try:
         image, callback_url = dockerhub.parse_webhook_payload(payload, repositories)
     except ValueError as e:
         logger.critical(e)
         return Response(status_code=404)
 
-    # Callback and verify
+    # Call back to dockerhub to verify legit webhook
     acked = dockerhub.callback(callback_url, "Valid webhook received")
     if not acked:
         logger.critical("Failed to call back to dockerhub", callback_url)
         return Response(status_code=400)
 
+    # Update all services matching this image
     try:
-        # Update all services matching this image
         updated_services = app.state.client.update_services(image=image)
     except Exception as e:
         logger.error(e)
         return Response(status_code=500)
-
-    if not updated_services:
-        logger.error("No services updated by dockerhub webhook for image: %s", image)
-        dockerhub.callback(callback_url, "Non-tracked image", state="failure")
-        return Response(None, status_code=400)
-
-    dockerhub.callback(
-        callback_url,
-        "Updated services: [{}]".format(", ".join((s.name for s in updated_services))),
-    )
 
     return JSONResponse(
         [

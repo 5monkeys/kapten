@@ -158,7 +158,8 @@ class ServerTestCase(KaptenTestCase):
         with self.mock_server(services, with_new_distribution=False) as (http, _):
             with self.mock_dockerhub(tag="dev") as payload:
                 response = http.post("/webhook/dockerhub/MY-TOKEN", json=payload)
-                self.assertEqual(response.status_code, 400)
+                self.assertEqual(response.status_code, 200)
+                self.assertListEqual(response.json(), [])
 
     def test_dockerhub_endpoint_with_client_error(self):
         services = [("app", "5monkeys/app:latest@sha256:10001")]
