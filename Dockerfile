@@ -38,8 +38,7 @@ ENV PYTHONUNBUFFERED=1 \
 # Setup app user and directory
 RUN set -x && \
     groupadd -g 8000 kapten && \
-    useradd -r -u 8000 -g kapten kapten && \
-    mkdir /app && \
+    useradd -r -u 8000 -g kapten -m -d /app -k /dev/null kapten && \
     chown -R kapten:kapten /app
 
 # Install system dependencies
