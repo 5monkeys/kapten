@@ -1,68 +1,7 @@
-import copy
-import os
-
-from docker.api import APIClient
-from docker.errors import APIError
-from requests.exceptions import ConnectionError
-
 from . import slack
-from .exceptions import KaptenClientError, KaptenError
+from .dockerapi import DockerAPIClient
+from .exceptions import KaptenError
 from .log import logger
-
-
-class Service(dict):
-    @property
-    def id(self):
-        return self["ID"]
-
-    @property
-    def version(self):
-        return self["Version"]["Index"]
-
-    @property
-    def stack(self):
-        labels = self["Spec"]["TaskTemplate"]["ContainerSpec"]["Labels"]
-        return labels.get("com.docker.stack.namespace")
-
-    @property
-    def name(self):
-        return self["Spec"]["Name"]
-
-    @property
-    def short_name(self):
-        name = self.name
-        stack = self.stack
-        return name[len(stack) + 1 :] if name.startswith(stack + "_") else name
-
-    @property
-    def image_with_digest(self):
-        return self["Spec"]["TaskTemplate"]["ContainerSpec"]["Image"]
-
-    @property
-    def image(self):
-        image = self.image_with_digest
-        return image[: image.rindex("@")]
-
-    @property
-    def digest(self):
-        digest = self.image_with_digest
-        return digest[digest.rindex("@") + 1 :]
-
-    @property
-    def repository(self):
-        repository = self.image
-        return repository[: repository.index(":")]
-
-    # @property
-    # def tag(self):
-    # image = self.image
-    # return image[image.index(":") + 1 :]
-
-    def clone(self, digest):
-        clone = copy.deepcopy(self)
-        task_template = clone["Spec"]["TaskTemplate"]
-        task_template["ContainerSpec"]["Image"] = "{}@{}".format(self.image, digest)
-        return clone
 
 
 class Kapten:
@@ -81,7 +20,7 @@ class Kapten:
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
-        self.client = APIClient(base_url=os.environ.get("DOCKER_HOST"))
+        self.api = DockerAPIClient()
 
     def healthcheck(self):
         logger.info("Verifying connectivity and access to Docker API ...")
@@ -92,18 +31,16 @@ class Kapten:
         # Test one of the services repository access
         self.get_latest_digest(services[0].image)
 
-        return len(services)
+        nof_services = len(services)
+        logger.info(
+            "Tracking {} service{}", nof_services, "s" if nof_services > 1 else ""
+        )
+
+        return nof_services
 
     def get_latest_digest(self, image):
-        # Override auth config if environment variables present
-        auth_config = None
-        username = os.environ.get("DOCKER_USERNAME")
-        password = os.environ.get("DOCKER_PASSWORD")
-        if username and password:
-            auth_config = {"username": username, "password": password}
-
         # Inspect repository image
-        data = self.client.inspect_distribution(image, auth_config=auth_config)
+        data = self.api.inspect_distribution(image)
 
         # Locate latest digest
         digest = data.get("Descriptor", {}).get("digest")
@@ -113,23 +50,18 @@ class Kapten:
         return digest
 
     def list_services(self, image=None):
-        try:
-            service_specs = self.client.services({"name": self.service_names})
-        except ConnectionError as e:
-            raise KaptenClientError("Docker API Failure: {}".format(str(e))) from e
-        except APIError as e:
-            raise KaptenClientError("Docker API Error: {}".format(str(e))) from e
+        # List services
+        services = self.api.services(self.service_names)
 
-        # Sort specs in input order and filter out any non exact matches
-        service_specs = sorted(
-            filter(lambda s: s["Spec"]["Name"] in self.service_names, service_specs),
-            key=lambda s: self.service_names.index(s["Spec"]["Name"]),
+        # Sort in input order and filter out any non exact matches
+        services = sorted(
+            filter(lambda s: s.name in self.service_names, services),
+            key=lambda s: self.service_names.index(s.name),
         )
 
-        if len(service_specs) != len(self.service_names):
+        # Assert we got the services we asked for
+        if len(services) != len(self.service_names):
             raise KaptenError("Could not find all given services")
-
-        services = [Service(spec) for spec in service_specs]
 
         # Filter by given image
         if image:
@@ -168,7 +100,7 @@ class Kapten:
         )
 
         # Update service to latest image digest
-        self.client.update_service(
+        self.api.update_service(
             service.id,
             service.version,
             task_template=new_service["Spec"]["TaskTemplate"],

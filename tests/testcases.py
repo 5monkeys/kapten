@@ -53,12 +53,18 @@ class KaptenTestCase(unittest.TestCase):
         with_missing_distribution=False,
         with_new_distribution=True,
     ):
-        with mock.patch("kapten.tool.APIClient") as APIClient:
-            # Client instance
-            client = APIClient.return_value
-
+        with mock.patch(
+            "kapten.dockerapi.APIClient.services"
+        ) as services_mock, mock.patch(
+            "kapten.dockerapi.APIClient.inspect_distribution"
+        ) as inspect_distribution_mock, mock.patch(
+            "kapten.dockerapi.APIClient.update_service"
+        ) as update_service_mock, mock.patch(
+            "kapten.dockerapi.APIClient"
+        ) as APIClient:
             # Mock APIClient.services()
-            specs = (
+            APIClient.services = services_mock
+            APIClient.services.return_value = (
                 [
                     self.build_service_spec(service_name, image_name)
                     for service_name, image_name in reversed(services)
@@ -66,10 +72,9 @@ class KaptenTestCase(unittest.TestCase):
                 if not with_missing_services
                 else []
             )
-            client.services = mock.MagicMock(return_value=specs)
 
             # Mock APIClient.inspect_distribution()
-            def inspect_distribution_mock(image_name, auth_config=None):
+            def mocked_inspect_distribution(image_name, auth_config=None):
                 image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
                 if with_new_distribution:
@@ -78,11 +83,14 @@ class KaptenTestCase(unittest.TestCase):
                     return {}
                 return {"Descriptor": {"digest": "sha256:" + digest}}
 
-            client.inspect_distribution = mock.MagicMock(
-                side_effect=inspect_distribution_mock
-            )
+            APIClient.inspect_distribution = inspect_distribution_mock
+            APIClient.inspect_distribution.side_effect = mocked_inspect_distribution
 
-            yield client
+            # Mock APIClient.update_service()
+            APIClient.update_service = update_service_mock
+            APIClient.update_service.return_value = {}
+
+            yield APIClient
 
     @contextlib.contextmanager
     def mock_slack(self, response="ok", token="token"):

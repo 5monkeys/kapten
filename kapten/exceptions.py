@@ -4,3 +4,7 @@ class KaptenError(Exception):
 
 class KaptenClientError(KaptenError):
     pass
+
+
+class KaptenAPIError(KaptenError):
+    pass
