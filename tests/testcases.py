@@ -69,7 +69,7 @@ class KaptenTestCase(unittest.TestCase):
             client.services = mock.MagicMock(return_value=specs)
 
             # Mock APIClient.inspect_distribution()
-            def inspect_distribution_mock(image_name):
+            def inspect_distribution_mock(image_name, auth_config=None):
                 image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
                 if with_new_distribution:

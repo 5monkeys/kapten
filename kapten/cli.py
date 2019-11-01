@@ -105,6 +105,9 @@ def command(input_args=None):
     )
 
     try:
+        # Verify kapten can connect and access docker engine and registry
+        client.healthcheck()
+
         if hasattr(args, "server") and args.server:
             # Start server
             from kapten import server

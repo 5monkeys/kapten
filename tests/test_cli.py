@@ -141,6 +141,12 @@ class CLICommandTestCase(KaptenTestCase):
     def test_command_docker_api_error(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
+
+        with self.mock_docker_api(with_missing_services=True) as api:
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
         with self.mock_docker_api(services) as api:
             api.services.side_effect = ConnectionError("Mocked Docker Connection Error")
             with self.assertRaises(SystemExit) as cm:

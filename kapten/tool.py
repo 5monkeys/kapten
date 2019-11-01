@@ -83,6 +83,17 @@ class Kapten:
         self.force = force
         self.client = APIClient(base_url=os.environ.get("DOCKER_HOST"))
 
+    def healthcheck(self):
+        logger.info("Verifying connectivity and access to Docker API ...")
+
+        # Test listing tracked services
+        services = self.list_services()
+
+        # Test one of the services repository access
+        self.get_latest_digest(services[0].image)
+
+        return len(services)
+
     def get_latest_digest(self, image):
         # Override auth config if environment variables present
         auth_config = None
@@ -105,9 +116,9 @@ class Kapten:
         try:
             service_specs = self.client.services({"name": self.service_names})
         except ConnectionError as e:
-            raise KaptenClientError("Docker API Failure: {}".format(str(e)))
+            raise KaptenClientError("Docker API Failure: {}".format(str(e))) from e
         except APIError as e:
-            raise KaptenClientError("Docker API Error: {}".format(str(e)))
+            raise KaptenClientError("Docker API Error: {}".format(str(e))) from e
 
         # Sort specs in input order and filter out any non exact matches
         service_specs = sorted(
