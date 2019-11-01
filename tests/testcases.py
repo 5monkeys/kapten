@@ -1,17 +1,17 @@
 import contextlib
 import json
-import unittest
 from io import StringIO
 from itertools import chain, repeat
 from random import randint
 from unittest import mock
 
+import asynctest
 import responses
 
 import kapten
 
 
-class KaptenTestCase(unittest.TestCase):
+class KaptenTestCase(asynctest.TestCase):
     def setUp(self):
         # Mock logger
         self.logger_mock = mock.MagicMock()

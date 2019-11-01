@@ -1,3 +1,4 @@
+import unittest
 from unittest import mock
 
 from kapten.dockerapi import DockerAPIClient
@@ -5,7 +6,7 @@ from kapten.dockerapi import DockerAPIClient
 from .testcases import KaptenTestCase
 
 
-class DockerAPITestCase(KaptenTestCase):
+class DockerAPIClientTestCase(KaptenTestCase):
     def test_auth_config(self):
         services = [("foobar", "foo/bar:baz@sha256:1")]
         with self.mock_docker_api(services) as api:
@@ -21,3 +22,9 @@ class DockerAPITestCase(KaptenTestCase):
                 self.assertDictEqual(
                     call_kwargs, {"auth_config": {"username": "foo", "password": "bar"}}
                 )
+
+    @unittest.skip
+    async def test_version(self):
+        api = DockerAPIClient()
+        version = await api.version()
+        self.assertDictEqual(version, {})

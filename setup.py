@@ -14,8 +14,11 @@ here = path.dirname(path.abspath(__file__))
 with codecs.open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
 
+# Install requirements
+install_requires = ["docker", "httpx>=0.7.5,<0.8"]
+
 # Test requirements
-tests_require = ["responses"]
+tests_require = ["responses", "asynctest"]
 if kapten.supports_feature("server"):
     tests_require.append("starlette>=0.12.10,<0.13")
 
@@ -56,7 +59,7 @@ setup(
     ],
     packages=["kapten"],
     entry_points={"console_scripts": ["kapten = kapten.cli:command"]},
-    install_requires=["docker"],
+    install_requires=install_requires,
     extras_require={"server": server_requirements},
     tests_require=tests_require,
     test_suite="tests",

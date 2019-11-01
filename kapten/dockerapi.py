@@ -1,8 +1,17 @@
+import asyncio
 import copy
 import os
+import ssl
+import typing
+from urllib.parse import quote_plus, unquote_plus, urljoin
 
+import httpx
 from docker.api import APIClient
 from docker.errors import APIError
+from httpx.concurrency.asyncio import AsyncioBackend, TCPStream
+from httpx.concurrency.base import BaseTCPStream
+from httpx.config import TimeoutConfig
+from httpx.exceptions import ConnectTimeout
 from requests.exceptions import ConnectionError
 
 from .exceptions import KaptenAPIError
@@ -75,10 +84,52 @@ def error_handler(f):
     return wrapper
 
 
+class AsyncioUnixSocketBackend(AsyncioBackend):
+    async def open_tcp_stream(
+        self,
+        hostname: str,
+        port: int,
+        ssl_context: typing.Optional[ssl.SSLContext],
+        timeout: TimeoutConfig,
+    ) -> BaseTCPStream:
+        try:
+            path = unquote_plus(hostname)
+            stream_reader, stream_writer = await asyncio.wait_for(  # type: ignore
+                asyncio.open_unix_connection(path, ssl=ssl_context),
+                timeout.connect_timeout,
+            )
+        except asyncio.TimeoutError:
+            raise ConnectTimeout()
+
+        return TCPStream(
+            stream_reader=stream_reader, stream_writer=stream_writer, timeout=timeout
+        )
+
+
 class DockerAPIClient(APIClient):
     def __init__(self, *args, **kwargs):
         kwargs.setdefault("base_url", os.environ.get("DOCKER_HOST"))
         super().__init__(*args, **kwargs)
+
+        host = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
+
+        if host.startswith("unix://"):
+            path = quote_plus(host[6:])
+            self.base_url = "http://{}".format(path)
+            self.backend = AsyncioUnixSocketBackend()
+
+        elif host.startswith("tcp://"):
+            self.base_url = host.replace("tcp://", "http://")
+            self.backend = None
+
+    def get_url(self, path):
+        return urljoin(self.base_url, "/version")
+
+    async def version(self):
+        async with httpx.AsyncClient(backend=self.backend) as client:
+            url = self.get_url("/version")
+            response = await client.get(url)
+            return response.json()
 
     @error_handler
     def services(self, names=None):
