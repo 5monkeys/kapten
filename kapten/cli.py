@@ -2,6 +2,8 @@ import argparse
 import logging
 import sys
 
+import kapten
+
 from . import __version__
 from .exceptions import KaptenError
 from .log import logger
@@ -30,6 +32,26 @@ def command(input_args=None):
         help="Service to update.",
     )
     parser.add_argument("-p", "--project", type=str, help="Optional project name.")
+
+    if kapten.has_feature("server"):
+        parser.add_argument(
+            "--server", action="store_true", help="Run kapten in server mode."
+        )
+        parser.add_argument(
+            "--host",
+            type=str,
+            default="0.0.0.0",
+            help="Kapten server host. [default: 0.0.0.0]",
+        )
+        parser.add_argument(
+            "--port", type=int, default=8800, help="Kapten server port. [default: 8800]"
+        )
+        parser.add_argument(
+            "--webhook-token",
+            type=str,
+            help="Server token to use for webhook endpoints.",
+        )
+
     parser.add_argument(
         "--slack-token", type=str, help="Slack token to use for notification."
     )
@@ -45,7 +67,11 @@ def command(input_args=None):
     )
     parser.add_argument("--force", action="store_true", help="Force service update.")
     parser.add_argument(
-        "-v", "--verbosity", type=int, default=1, help="Level of verbosity."
+        "-v",
+        "--verbosity",
+        type=int,
+        default=1,
+        help="Level of verbosity. [default: 1]",
     )
 
     args = parser.parse_args(input_args)
@@ -68,7 +94,7 @@ def command(input_args=None):
 
     logger.setLevel(level)
 
-    # Run tool
+    # Configure
     client = Kapten(
         args.services,
         project=args.project,
@@ -77,8 +103,24 @@ def command(input_args=None):
         only_check=args.check,
         force=args.force,
     )
+
     try:
-        client.update_services()
+        # Verify kapten can connect and access docker engine and registry
+        client.healthcheck()
+
+        if hasattr(args, "server") and args.server:
+            # Start server
+            from kapten import server
+
+            if not args.webhook_token:
+                parser.error("Missing required argument WEBHOOK_TOKEN")
+
+            server.run(client, token=args.webhook_token, host=args.host, port=args.port)
+
+        else:
+            # Run one-off check/update
+            client.update_services()
+
     except KaptenError as e:
         logger.critical(str(e))
         exit(666)

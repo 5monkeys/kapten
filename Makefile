@@ -1,6 +1,6 @@
 .PHONY: test
 test:
-	python setup.py test
+	python setup.py test $(test)
 
 
 .PHONY: coverage
@@ -17,8 +17,9 @@ lint:
 
 .PHONY: format
 format:
-	black kapten
-	isort -rc kapten
+	black kapten tests
+	autoflake -r -i --remove-all-unused-imports kapten tests
+	isort -rc kapten tests
 
 
 .PHONY: clean
@@ -31,3 +32,14 @@ clean:
 publish: clean
 	python setup.py sdist bdist_wheel
 	python -m twine upload dist/*
+
+
+.PHONY: requirements
+requirements:
+	pip-compile \
+		--upgrade --pre --generate-hashes \
+		--output-file requirements.dev.txt \
+		requirements.dev.in
+	chown \
+		--reference requirements.dev.in \
+		requirements.dev.txt

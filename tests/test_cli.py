@@ -1,21 +1,18 @@
 import logging
 import unittest
-from itertools import chain, repeat
 from unittest import mock
 from unittest.mock import call
 
+from docker.errors import APIError
+from requests.exceptions import ConnectionError
+
+import kapten
 from kapten import __version__, cli
 
 from .testcases import KaptenTestCase
 
 
 class CLICommandTestCase(KaptenTestCase):
-    def build_sys_args(self, services, *args):
-        service_names = [name for name, _ in services]
-        argv = list(chain(*zip(repeat("-s", len(service_names)), service_names)))
-        argv.extend(args)
-        return argv
-
     def test_command(self):
         services = [
             ("stack_app", "repository/app_image:latest@sha256:10001"),
@@ -79,14 +76,14 @@ class CLICommandTestCase(KaptenTestCase):
     def test_command_noop(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
-        with self.mock_docker_api(services, with_new_digest=False) as client:
+        with self.mock_docker_api(services, with_new_distribution=False) as client:
             cli.command(argv)
             self.assertFalse(client.update_service.called)
 
     def test_command_force(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--force")
-        with self.mock_docker_api(services, with_new_digest=False) as client:
+        with self.mock_docker_api(services, with_new_distribution=False) as client:
             cli.command(argv)
             self.assertTrue(client.update_service.called)
 
@@ -106,7 +103,7 @@ class CLICommandTestCase(KaptenTestCase):
         with self.assertRaises(SystemExit) as cm:
             with self.mock_stderr() as stderr:
                 cli.command([])
-        self.assertIn("Missing required", stderr.getvalue())
+        self.assertIn("SERVICES", stderr.getvalue())
         self.assertEqual(cm.exception.code, 2)
 
     def test_command_version(self):
@@ -124,7 +121,7 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, service_failure=True):
+        with self.mock_docker_api(services, with_missing_services=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
@@ -136,7 +133,59 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, registry_failure=True):
+        with self.mock_docker_api(services, with_missing_distribution=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
+
+    def test_command_docker_api_error(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services)
+
+        with self.mock_docker_api(services) as api:
+            api.services.side_effect = ConnectionError("Mocked Docker Connection Error")
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
+            api.services.side_effect = APIError("Mocked Docker API Error")
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
+    def test_command_server_not_supported(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(
+            services, "--server", "--host", "1.2.3.4", "--port", "8888"
+        )
+        with mock.patch.dict("sys.modules", uvicorn=None):
+            with self.assertRaises(SystemExit) as cm:
+                with self.mock_stderr() as stderr:
+                    cli.command(argv)
+
+        self.assertIn("unrecognized arguments: --server", stderr.getvalue())
+        self.assertEqual(cm.exception.code, 2)
+
+    @unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
+    def test_command_server(self):
+        from kapten.server import app
+
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(
+            services, "--server", "--host", "1.2.3.4", "--port", "8888"
+        )
+        uvicorn = mock.MagicMock()
+        with mock.patch.dict("sys.modules", uvicorn=uvicorn):
+            with self.mock_docker_api(services):
+                with self.assertRaises(SystemExit) as cm:
+                    with self.mock_stderr() as stderr:
+                        cli.command(argv)
+                self.assertIn("WEBHOOK_TOKEN", stderr.getvalue())
+                self.assertEqual(cm.exception.code, 2)
+
+                cli.command(argv + ["--webhook-token", "my-secret-token"])
+                self.assertTrue(uvicorn.run.called)
+                self.assertEqual(
+                    uvicorn.run.mock_calls[0],
+                    call(app, host="1.2.3.4", port=8888, proxy_headers=True),
+                )

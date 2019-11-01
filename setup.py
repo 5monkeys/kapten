@@ -5,13 +5,30 @@ from os import path
 from setuptools import setup
 
 # Get version from package
-version = __import__("kapten").__version__
+kapten = __import__("kapten")
+version = kapten.__version__
 
 # Get the long description from the README
 long_description = None
 here = path.dirname(path.abspath(__file__))
 with codecs.open(path.join(here, "README.md"), encoding="utf-8") as f:
     long_description = f.read()
+
+# Test requirements
+tests_require = ["responses"]
+if kapten.supports_feature("server"):
+    tests_require.append("starlette>=0.12.10,<0.13")
+
+# Server requirements
+server_requirements = (
+    [
+        "uvloop==0.14.0rc1",  # TODO: Bump when released or remove when uvicorn bumped
+        "uvicorn>=0.9.1,<0.10",
+        "starlette>=0.12.10,<0.13",
+    ]
+    if kapten.supports_feature("server")
+    else []
+)
 
 setup(
     name="kapten",
@@ -25,21 +42,22 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Environment :: Console',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: MIT License',
-        'Operating System :: OS Independent',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
+        "Development Status :: 5 - Production/Stable",
+        "Environment :: Console",
+        "Intended Audience :: Developers",
+        "License :: OSI Approved :: MIT License",
+        "Operating System :: OS Independent",
+        "Programming Language :: Python",
+        "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
     ],
     packages=["kapten"],
     entry_points={"console_scripts": ["kapten = kapten.cli:command"]},
     install_requires=["docker"],
-    tests_require=["coverage", "responses"],
+    extras_require={"server": server_requirements},
+    tests_require=tests_require,
     test_suite="tests",
 )

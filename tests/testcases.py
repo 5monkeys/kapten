@@ -2,19 +2,32 @@ import contextlib
 import json
 import unittest
 from io import StringIO
+from itertools import chain, repeat
 from random import randint
 from unittest import mock
 
 import responses
 
+import kapten
+
 
 class KaptenTestCase(unittest.TestCase):
     def setUp(self):
+        # Mock logger
         self.logger_mock = mock.MagicMock()
-        for module in ["cli", "tool", "slack"]:
+        modules = ["cli", "tool", "slack"]
+        if kapten.supports_feature("server"):
+            modules.append("server")
+        for module in modules:
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
+
+    def build_sys_args(self, services, *args):
+        service_names = [name for name, _ in services]
+        argv = list(chain(*zip(repeat("-s", len(service_names)), service_names)))
+        argv.extend(args)
+        return argv
 
     def build_service_spec(self, service_name, image_name):
         stack = service_name.split("_")[0]
@@ -36,40 +49,48 @@ class KaptenTestCase(unittest.TestCase):
     def mock_docker_api(
         self,
         services=None,
-        service_failure=False,
-        registry_failure=False,
-        with_new_digest=True,
+        with_missing_services=False,
+        with_missing_distribution=False,
+        with_new_distribution=True,
     ):
-        with mock.patch("kapten.tool.APIClient") as APIClient:
-            # Client instance
-            client = APIClient.return_value
-
+        with mock.patch(
+            "kapten.dockerapi.APIClient.services"
+        ) as services_mock, mock.patch(
+            "kapten.dockerapi.APIClient.inspect_distribution"
+        ) as inspect_distribution_mock, mock.patch(
+            "kapten.dockerapi.APIClient.update_service"
+        ) as update_service_mock, mock.patch(
+            "kapten.dockerapi.APIClient"
+        ) as APIClient:
             # Mock APIClient.services()
-            specs = (
+            APIClient.services = services_mock
+            APIClient.services.return_value = (
                 [
                     self.build_service_spec(service_name, image_name)
                     for service_name, image_name in reversed(services)
                 ]
-                if not service_failure
+                if not with_missing_services
                 else []
             )
-            client.services = mock.MagicMock(return_value=specs)
 
             # Mock APIClient.inspect_distribution()
-            def inspect_distribution_mock(image_name):
+            def mocked_inspect_distribution(image_name, auth_config=None):
                 image = [img for _, img in services if img.startswith(image_name)][0]
                 _, digest = image.rsplit(":", 1)
-                if with_new_digest:
+                if with_new_distribution:
                     digest = str(int(digest) + 1)
-                if registry_failure:
+                if with_missing_distribution:
                     return {}
                 return {"Descriptor": {"digest": "sha256:" + digest}}
 
-            client.inspect_distribution = mock.MagicMock(
-                side_effect=inspect_distribution_mock
-            )
+            APIClient.inspect_distribution = inspect_distribution_mock
+            APIClient.inspect_distribution.side_effect = mocked_inspect_distribution
 
-            yield client
+            # Mock APIClient.update_service()
+            APIClient.update_service = update_service_mock
+            APIClient.update_service.return_value = {}
+
+            yield APIClient
 
     @contextlib.contextmanager
     def mock_slack(self, response="ok", token="token"):

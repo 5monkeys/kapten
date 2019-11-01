@@ -1,11 +1,10 @@
-from docker.api import APIClient
-
 from . import slack
+from .dockerapi import DockerAPIClient
 from .exceptions import KaptenError
 from .log import logger
 
 
-class Kapten(object):
+class Kapten:
     def __init__(
         self,
         service_names,
@@ -21,89 +20,121 @@ class Kapten(object):
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
-        self.client = APIClient()
+        self.api = DockerAPIClient()
 
-    def get_latest_digest(self, image_name):
-        data = self.client.inspect_distribution(image_name)
-        digest = data["Descriptor"]["digest"]
+    def healthcheck(self):
+        logger.info("Verifying connectivity and access to Docker API ...")
+
+        # Test listing tracked services
+        services = self.list_services()
+
+        # Test one of the services repository access
+        self.get_latest_digest(services[0].image)
+
+        nof_services = len(services)
+        logger.info(
+            "Tracking {} service{}", nof_services, "s" if nof_services > 1 else ""
+        )
+
+        return nof_services
+
+    def get_latest_digest(self, image):
+        # Inspect repository image
+        data = self.api.inspect_distribution(image)
+
+        # Locate latest digest
+        digest = data.get("Descriptor", {}).get("digest")
+        if not digest:
+            raise KaptenError("Failed to get latest digest for image: {}".format(image))
+
         return digest
 
-    def list_services(self):
-        service_specs = self.client.services({"name": self.service_names})
+    def list_services(self, image=None):
+        # List services
+        services = self.api.services(self.service_names)
 
-        # Sort specs in input order and filter out any non exact matches
-        service_specs = sorted(
-            filter(lambda s: s["Spec"]["Name"] in self.service_names, service_specs),
-            key=lambda s: self.service_names.index(s["Spec"]["Name"]),
+        # Sort in input order and filter out any non exact matches
+        services = sorted(
+            filter(lambda s: s.name in self.service_names, services),
+            key=lambda s: self.service_names.index(s.name),
         )
 
-        if len(service_specs) != len(self.service_names):
+        # Assert we got the services we asked for
+        if len(services) != len(self.service_names):
             raise KaptenError("Could not find all given services")
 
-        return service_specs
+        # Filter by given image
+        if image:
+            services = list(filter(lambda s: s.image == image, services))
 
-    def update_service(self, spec):
-        service_id = spec["ID"]
-        service_version = spec["Version"]["Index"]
-        service_name = spec["Spec"]["Name"]
-        task_template = spec["Spec"]["TaskTemplate"]
-        container_spec = task_template["ContainerSpec"]
-        stack = container_spec["Labels"].get("com.docker.stack.namespace", None)
-        service_short_name = (
-            service_name[len(stack) + 1 :]
-            if service_name.startswith(stack + "_")
-            else service_name
+        return services
+
+    def list_repositories(self):
+        services = self.list_services()
+        repositories = {service.repository for service in services}
+        return sorted(repositories)
+
+    def update_service(self, service, digest):
+        logger.debug("Stack:     %s", service.stack or "-")
+        logger.debug("Service:   %s", service.short_name)
+        logger.debug("Image:     %s", service.image)
+        logger.debug("  Current: %s", service.digest)
+        logger.debug("  Latest:  %s", digest)
+
+        if not self.force and digest == service.digest:
+            return
+
+        # Clone service spec with new image digest
+        new_service = service.clone(digest)
+
+        if self.only_check:
+            logger.info(
+                "Can update service %s to %s",
+                service.name,
+                new_service.image_with_digest,
+            )
+            return new_service
+
+        logger.info(
+            "Updating service %s to %s", service.name, new_service.image_with_digest
         )
-        container_image = container_spec["Image"]
-        image_name, _, current_digest = container_image.partition("@")
 
-        # Fetch latest image digest
-        latest_digest = self.get_latest_digest(image_name)
-        latest_image = "{}@{}".format(image_name, latest_digest)
+        # Update service to latest image digest
+        self.api.update_service(
+            service.id,
+            service.version,
+            task_template=new_service["Spec"]["TaskTemplate"],
+            fetch_current_spec=True,
+        )
 
-        logger.debug("Stack:     %s", stack or "-")
-        logger.debug("Service:   %s", service_short_name)
-        logger.debug("Image:     %s", image_name)
-        logger.debug("  Current: %s", current_digest)
-        logger.debug("  Latest:  %s", latest_digest)
-
-        if self.force or latest_digest != current_digest:
-            if self.only_check:
-                logger.info("Can update service %s to %s", service_name, latest_image)
-                return
-
-            logger.info("Updating service %s to %s", service_name, latest_image)
-
-            # Update service to latest image
-            task_template["ContainerSpec"]["Image"] = latest_image
-            self.client.update_service(
-                service_id,
-                service_version,
-                task_template=task_template,
-                fetch_current_spec=True,
+        # Notify slack
+        if self.slack_token:
+            slack.notify(
+                self.slack_token,
+                service.name,
+                digest,
+                channel=self.slack_channel,
+                project=self.project,
+                stack=service.stack,
+                service_short_name=service.short_name,
+                image=service.image,
             )
 
-            # Notify slack
-            if self.slack_token:
-                slack.notify(
-                    self.slack_token,
-                    service_name,
-                    latest_digest,
-                    channel=self.slack_channel,
-                    project=self.project,
-                    stack=stack,
-                    service_short_name=service_short_name,
-                    image_name=image_name,
-                )
+        return new_service
 
-    def update_services(self):
-        service_specs = self.list_services()
-        for service_spec in service_specs:
-            try:
-                self.update_service(service_spec)
-            except Exception as e:
-                raise KaptenError(
-                    "Failed to update service {}: {}".format(
-                        service_spec["Spec"]["Name"], str(e)
-                    )
-                )
+    def update_services(self, services=None, image=None):
+        updated_services = []
+
+        services = services or self.list_services(image=image)
+        images = {
+            image: self.get_latest_digest(image)
+            for image in {service.image for service in services}
+        }
+
+        for service in services:
+            digest = images[service.image]
+            updated_service = self.update_service(service, digest=digest)
+            if updated_service:
+                updated_services.append(updated_service)
+
+        return updated_services
