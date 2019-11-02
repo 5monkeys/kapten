@@ -1,5 +1,5 @@
 from . import slack
-from .dockerapi import DockerAPIClient
+from .docker import DockerAPIClient
 from .exceptions import KaptenError
 from .log import logger
 

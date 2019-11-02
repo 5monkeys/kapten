@@ -54,13 +54,13 @@ class KaptenTestCase(asynctest.TestCase):
         with_new_distribution=True,
     ):
         with mock.patch(
-            "kapten.dockerapi.APIClient.services"
+            "kapten.docker.APIClient.services"
         ) as services_mock, mock.patch(
-            "kapten.dockerapi.APIClient.inspect_distribution"
+            "kapten.docker.APIClient.inspect_distribution"
         ) as inspect_distribution_mock, mock.patch(
-            "kapten.dockerapi.APIClient.update_service"
+            "kapten.docker.APIClient.update_service"
         ) as update_service_mock, mock.patch(
-            "kapten.dockerapi.APIClient"
+            "kapten.docker.APIClient"
         ) as APIClient:
             # Mock APIClient.services()
             APIClient.services = services_mock

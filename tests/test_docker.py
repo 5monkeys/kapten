@@ -1,7 +1,7 @@
 import unittest
 from unittest import mock
 
-from kapten.dockerapi import DockerAPIClient
+from kapten.docker import DockerAPIClient
 
 from .testcases import KaptenTestCase
 
