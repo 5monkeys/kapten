@@ -1,10 +1,8 @@
+import json
 import logging
 import unittest
 from unittest import mock
 from unittest.mock import call
-
-from docker.errors import APIError
-from requests.exceptions import ConnectionError
 
 import kapten
 from kapten import __version__, cli
@@ -28,20 +26,23 @@ class CLICommandTestCase(KaptenTestCase):
             "apa",
         )
 
-        with self.mock_docker_api(services) as client, self.mock_slack() as slack_mock:
+        with self.mock_docker(services) as httpx_mock, self.mock_slack() as slack_mock:
             cli.command(argv)
-            update_service_calls = client.update_service.mock_calls
-            self.assertEqual(len(update_service_calls), 2)
 
-            tpl1 = update_service_calls[0][2]["task_template"]
+            service_update_request = httpx_mock.patterns["service_update"]
+            self.assertEqual(service_update_request.call_count, 2)
+
+            request1 = service_update_request.mock_calls[0][2]["request"]
+            content1 = json.loads(request1.content.decode("utf-8"))
             self.assertEqual(
-                tpl1["ContainerSpec"]["Image"],
+                content1["TaskTemplate"]["ContainerSpec"]["Image"],
                 "repository/app_image:latest@sha256:10002",
             )
 
-            tpl2 = update_service_calls[1][2]["task_template"]
+            request2 = service_update_request.mock_calls[1][2]["request"]
+            content2 = json.loads(request2.content.decode("utf-8"))
             self.assertEqual(
-                tpl2["ContainerSpec"]["Image"],
+                content2["TaskTemplate"]["ContainerSpec"]["Image"],
                 "repository/db_image:latest@sha256:20002",
             )
 
@@ -55,7 +56,7 @@ class CLICommandTestCase(KaptenTestCase):
 
     def test_command_verbosity(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
-        with self.mock_docker_api(services):
+        with self.mock_docker(services):
             cli.command(self.build_sys_args(services, "-v", "0"))
             cli.command(self.build_sys_args(services, "-v", "1"))
             cli.command(self.build_sys_args(services, "-v", "2"))
@@ -68,7 +69,7 @@ class CLICommandTestCase(KaptenTestCase):
     def test_command_without_slack(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
-        with self.mock_docker_api(services):
+        with self.mock_docker(services):
             with mock.patch("kapten.slack.notify") as notify:
                 cli.command(argv)
                 self.assertFalse(notify.called)
@@ -76,16 +77,16 @@ class CLICommandTestCase(KaptenTestCase):
     def test_command_noop(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
-        with self.mock_docker_api(services, with_new_distribution=False) as client:
+        with self.mock_docker(services, with_new_distribution=False) as httpx_mock:
             cli.command(argv)
-            self.assertFalse(client.update_service.called)
+            self.assertFalse(httpx_mock.patterns["service_update"].called)
 
     def test_command_force(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--force")
-        with self.mock_docker_api(services, with_new_distribution=False) as client:
+        with self.mock_docker(services, with_new_distribution=False) as httpx_mock:
             cli.command(argv)
-            self.assertTrue(client.update_service.called)
+            self.assertTrue(httpx_mock.patterns["service_update"].called)
 
     def test_command_only_check(self):
         services = [
@@ -94,10 +95,9 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services, "--check")
 
-        with self.mock_docker_api(services) as client:
+        with self.mock_docker(services) as httpx_mock:
             cli.command(argv)
-            update_service_calls = client.update_service.mock_calls
-            self.assertEqual(len(update_service_calls), 0)
+            self.assertFalse(httpx_mock.patterns["service_update"].called)
 
     def test_command_required_args(self):
         with self.assertRaises(SystemExit) as cm:
@@ -121,7 +121,7 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, with_missing_services=True):
+        with self.mock_docker(services, with_missing_services=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
@@ -133,7 +133,7 @@ class CLICommandTestCase(KaptenTestCase):
         ]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services, with_missing_distribution=True):
+        with self.mock_docker(services, with_missing_distribution=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
@@ -142,13 +142,12 @@ class CLICommandTestCase(KaptenTestCase):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services)
 
-        with self.mock_docker_api(services) as api:
-            api.services.side_effect = ConnectionError("Mocked Docker Connection Error")
+        with self.mock_docker(services, with_api_exception=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
 
-            api.services.side_effect = APIError("Mocked Docker API Error")
+        with self.mock_docker(services, with_api_error=True):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
@@ -176,7 +175,7 @@ class CLICommandTestCase(KaptenTestCase):
         )
         uvicorn = mock.MagicMock()
         with mock.patch.dict("sys.modules", uvicorn=uvicorn):
-            with self.mock_docker_api(services):
+            with self.mock_docker(services):
                 with self.assertRaises(SystemExit) as cm:
                     with self.mock_stderr() as stderr:
                         cli.command(argv)

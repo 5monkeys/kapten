@@ -1,4 +1,5 @@
 import argparse
+import asyncio
 import logging
 import sys
 
@@ -106,7 +107,8 @@ def command(input_args=None):
 
     try:
         # Verify kapten can connect and access docker engine and registry
-        client.healthcheck()
+        loop = asyncio.get_event_loop()
+        loop.run_until_complete(client.healthcheck())
 
         if hasattr(args, "server") and args.server:
             # Start server
@@ -119,7 +121,7 @@ def command(input_args=None):
 
         else:
             # Run one-off check/update
-            client.update_services()
+            loop.run_until_complete(client.update_services())
 
     except KaptenError as e:
         logger.critical(str(e))
