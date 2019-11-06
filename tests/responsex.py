@@ -1,6 +1,7 @@
 import json
 import re
 from collections import defaultdict
+from functools import partial
 from unittest import mock
 
 import asynctest
@@ -8,6 +9,9 @@ from httpx.models import AsyncResponse
 
 GET = "GET"
 POST = "POST"
+
+istype = lambda t, o: isinstance(o, t)
+isregex = partial(istype, type(re.compile("")))
 
 
 class HTTPXMock:
@@ -55,7 +59,7 @@ class HTTPXMock:
 
     def match(self, request):
         for i, pattern in enumerate(list(self.pattern_map[request.method])):
-            if isinstance(pattern.url, re._pattern_type):
+            if isregex(pattern.url):
                 match = pattern.url.match(str(request.url))
                 if match:
                     return pattern, match.groupdict()
