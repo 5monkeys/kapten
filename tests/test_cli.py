@@ -27,17 +27,17 @@ class CLICommandTestCase(KaptenTestCase):
         with self.mock_docker(services) as httpx_mock, self.mock_slack() as slack_mock:
             cli.command(argv)
 
-            service_update_request = httpx_mock.patterns["service_update"]
-            self.assertEqual(service_update_request.call_count, 2)
+            service_update_request = httpx_mock["service_update"]
+            self.assertEqual(len(service_update_request.calls), 2)
 
-            request1 = service_update_request.mock_calls[0][2]["request"]
+            request1, _ = service_update_request.calls[0]
             content1 = json.loads(request1.content.decode("utf-8"))
             self.assertEqual(
                 content1["TaskTemplate"]["ContainerSpec"]["Image"],
                 "repository/app_image:latest@sha256:10002",
             )
 
-            request2 = service_update_request.mock_calls[1][2]["request"]
+            request2, _ = service_update_request.calls[1]
             content2 = json.loads(request2.content.decode("utf-8"))
             self.assertEqual(
                 content2["TaskTemplate"]["ContainerSpec"]["Image"],
@@ -77,14 +77,14 @@ class CLICommandTestCase(KaptenTestCase):
         argv = self.build_sys_args(services)
         with self.mock_docker(services, with_new_distribution=False) as httpx_mock:
             cli.command(argv)
-            self.assertFalse(httpx_mock.patterns["service_update"].called)
+            self.assertFalse(httpx_mock["service_update"].called)
 
     def test_command_force(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--force")
         with self.mock_docker(services, with_new_distribution=False) as httpx_mock:
             cli.command(argv)
-            self.assertTrue(httpx_mock.patterns["service_update"].called)
+            self.assertTrue(httpx_mock["service_update"].called)
 
     def test_command_only_check(self):
         services = [
@@ -95,7 +95,7 @@ class CLICommandTestCase(KaptenTestCase):
 
         with self.mock_docker(services) as httpx_mock:
             cli.command(argv)
-            self.assertFalse(httpx_mock.patterns["service_update"].called)
+            self.assertFalse(httpx_mock["service_update"].called)
 
     def test_command_required_args(self):
         with self.assertRaises(SystemExit) as cm:

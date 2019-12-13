@@ -1,5 +1,6 @@
 import contextlib
 import json
+import os
 import re
 from functools import partial
 from io import StringIO
@@ -10,9 +11,8 @@ from unittest import mock
 import asynctest
 import httpx
 import responses
+import respx
 from httpx.exceptions import ConnectTimeout
-
-from . import responsex
 
 
 class KaptenTestCase(asynctest.TestCase):
@@ -52,7 +52,7 @@ class KaptenTestCase(asynctest.TestCase):
         ]
 
     def build_distribution_response(
-        self, services=None, with_new_digest=True, image=None
+        self, request, services=None, with_new_digest=True, image=None
     ):
         if services and image:
             service_image = [img for _, img in services if img.startswith(image)][0]
@@ -80,11 +80,31 @@ class KaptenTestCase(asynctest.TestCase):
         with_new_distribution=True,
         with_api_error=False,
         with_api_exception=False,
+        with_auth_header=True,
+        with_unsupported_api_version=False,
     ):
-        with responsex.HTTPXMock() as httpx_mock:
+        env = (
+            {"DOCKER_USERNAME": "foo", "DOCKER_PASSWORD": "bar"}
+            if with_auth_header
+            else {}
+        )
+        services = services or []
+        with mock.patch.dict(os.environ, env), respx.mock(
+            assert_all_called=False
+        ) as httpx_mock:
+            error_message = {"message": "We've got problem"}
+
+            # Mock version request
+            httpx_mock.get(
+                re.compile(r"^http://[^/]+/version$"),
+                content={
+                    "ApiVersion": "1.23" if with_unsupported_api_version else "1.40"
+                },
+                alias="version",
+            )
+
             # Mock services request
-            httpx_mock.add(
-                responsex.GET,
+            httpx_mock.get(
                 re.compile(r"^http://[^/]+/services\??.*$"),
                 content=(
                     ConnectTimeout()
@@ -93,39 +113,38 @@ class KaptenTestCase(asynctest.TestCase):
                     if not with_missing_services
                     else []
                 ),
-                content_type="application/json",
-                alias="services",
+                alias="version",
             )
 
             # Mock distribution request
-            httpx_mock.add(
-                responsex.GET,
+            httpx_mock.get(
                 re.compile(r"^http://[^/]+/distribution/(?P<image>.+/?.*)/json$"),
                 status_code=(
                     httpx.codes.UNAUTHORIZED
                     if with_missing_distribution
                     else httpx.codes.OK
                 ),
-                content=partial(
-                    self.build_distribution_response,
-                    services=services,
-                    with_new_digest=with_new_distribution,
+                content=(
+                    error_message
+                    if with_missing_distribution
+                    else partial(
+                        self.build_distribution_response,
+                        services=services,
+                        with_new_digest=with_new_distribution,
+                    )
                 ),
-                content_type="application/json",
                 alias="distribution",
             )
 
             # Mock service update request
-            httpx_mock.add(
-                responsex.POST,
+            httpx_mock.post(
                 re.compile(r"http://[^/]+/services/[0-9]+/update"),
                 status_code=(
                     httpx.codes.SERVICE_UNAVAILABLE
                     if with_api_error
                     else httpx.codes.OK
                 ),
-                content=[],
-                content_type="application/json",
+                content=error_message if with_api_error else [],
                 alias="service_update",
             )
 
