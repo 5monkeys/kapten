@@ -21,7 +21,11 @@ def test(session):
     )
     session.install("-e", ".[server]")
 
-    session.run("pytest", "-v", *session.posargs)
+    options = session.posargs
+    if "-k" in options:
+        options.append("--no-cov")
+
+    session.run("pytest", "-v", *options)
 
 
 @nox.session
