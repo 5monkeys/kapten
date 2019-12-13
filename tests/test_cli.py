@@ -1,10 +1,8 @@
 import json
 import logging
-import unittest
 from unittest import mock
 from unittest.mock import call
 
-import kapten
 from kapten import __version__, cli
 
 from .testcases import KaptenTestCase
@@ -165,7 +163,6 @@ class CLICommandTestCase(KaptenTestCase):
         self.assertIn("unrecognized arguments: --server", stderr.getvalue())
         self.assertEqual(cm.exception.code, 2)
 
-    @unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
     def test_command_server(self):
         from kapten.server import app
 

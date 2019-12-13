@@ -3,8 +3,6 @@ import asyncio
 import logging
 import sys
 
-import kapten
-
 from . import __version__
 from .exceptions import KaptenError
 from .log import logger
@@ -34,7 +32,7 @@ def command(input_args=None):
     )
     parser.add_argument("-p", "--project", type=str, help="Optional project name.")
 
-    if kapten.has_feature("server"):
+    if has_feature("server"):
         parser.add_argument(
             "--server", action="store_true", help="Run kapten in server mode."
         )
@@ -126,3 +124,13 @@ def command(input_args=None):
     except KaptenError as e:
         logger.critical(str(e))
         exit(666)
+
+
+def has_feature(name):
+    if name == "server":  # pragma: nocover
+        try:
+            import uvicorn, starlette  # noqa
+        except ImportError:
+            return False
+        else:
+            return True

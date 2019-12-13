@@ -3,19 +3,14 @@ import unittest
 from unittest import mock
 
 import responses
+from starlette.testclient import TestClient
 
-import kapten
-from kapten import __version__
+from kapten import __version__, server
 from kapten.tool import Kapten
 
 from .testcases import KaptenTestCase
 
-if kapten.supports_feature("server"):
-    from starlette.testclient import TestClient
-    from kapten import server
 
-
-@unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None, **kwargs):

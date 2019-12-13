@@ -12,8 +12,6 @@ import httpx
 import responses
 from httpx.exceptions import ConnectTimeout
 
-import kapten
-
 from . import responsex
 
 
@@ -21,9 +19,7 @@ class KaptenTestCase(asynctest.TestCase):
     def setUp(self):
         # Mock logger
         self.logger_mock = mock.MagicMock()
-        modules = ["cli", "tool", "slack"]
-        if kapten.supports_feature("server"):
-            modules.append("server")
+        modules = ["cli", "tool", "slack", "server"]
         for module in modules:
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
