@@ -55,7 +55,7 @@ class KaptenTestCase(asynctest.TestCase):
         self, request, services=None, with_new_digest=True, image=None
     ):
         digest = "1234567890"
-        if services and image:
+        if services and image:  # pragma: nocover
             service_image = [img for _, img in services if img.startswith(image)][0]
             _, digest = service_image.rsplit(":", 1)
             if with_new_digest:

@@ -49,7 +49,7 @@ async def dockerhub_webhook(request):
     except KaptenAPIError as e:
         logger.warning(e)
         return Response(status_code=503)
-    except Exception as e:
+    except Exception as e:  # pragma: nocover
         logger.error(e)
         return Response(status_code=500)
 

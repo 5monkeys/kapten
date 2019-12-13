@@ -129,13 +129,11 @@ class Kapten:
 
         return new_service
 
-    async def update_services(self, services=None, image=None):
+    async def update_services(self, image=None):
         updated_services = []
 
-        if not services:
-            services = await self.list_services(image=image)
-
         # TODO: Run requests in parallel
+        services = await self.list_services(image=image)
         images = {
             image: await self.get_latest_digest(image)
             for image in {service.image for service in services}

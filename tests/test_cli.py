@@ -150,6 +150,15 @@ class CLICommandTestCase(KaptenTestCase):
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)
 
+    def test_healthcheck_failure(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services, "--check")
+
+        with self.mock_docker(with_unsupported_api_version=True):
+            with self.assertRaises(SystemExit) as cm:
+                cli.command(argv)
+            self.assertEqual(cm.exception.code, 666)
+
     def test_command_server_not_supported(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(
