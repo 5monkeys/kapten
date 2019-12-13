@@ -1,4 +1,6 @@
+import os
 import unittest
+from unittest import mock
 
 from kapten.docker import DockerAPIClient
 
@@ -45,3 +47,10 @@ class DockerAPIClientTestCase(KaptenTestCase):
             await api.distribution("foo/bar:baz")
             request, _ = httpx_mock["distribution"].calls[0]
             self.assertNotIn("x-registry-auth", request.headers.keys())
+
+    async def test_tcp_host(self):
+        with mock.patch.dict(os.environ, {"DOCKER_HOST": "tcp://localhost:2375"}):
+            api = DockerAPIClient()
+            with self.mock_docker():
+                version = await api.version()
+                self.assertIn("ApiVersion", version)

@@ -68,15 +68,14 @@ class Service(dict):
 
 class DockerAPIClient:
     def __init__(self, *args, **kwargs):
-        host = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
-        base_url = None
+        base_url = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
         uds = None
 
-        if host.startswith("unix://"):
+        if base_url.startswith("unix://"):
+            uds = base_url[6:]
             base_url = "http://localhost"
-            uds = host[6:]
-        elif host.startswith("tcp://"):
-            base_url = host.replace("tcp://", "http://")
+        else:
+            base_url = base_url.replace("tcp://", "http://")
 
         self.config = {"base_url": base_url, "uds": uds}
 
@@ -111,7 +110,7 @@ class DockerAPIClient:
                 )
             except ConnectTimeout as e:
                 raise KaptenConnectionError("Docker API Connection Error") from e
-            except Exception as e:
+            except Exception as e:  # pragma: nocover
                 raise KaptenAPIError("Docker API Error: {}".format(str(e))) from e
 
             if response.status_code >= 400:
