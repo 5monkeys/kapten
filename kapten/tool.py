@@ -20,17 +20,25 @@ class Kapten:
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
-        self.api = DockerAPIClient()
+        self.docker = DockerAPIClient()
 
     async def healthcheck(self):
         logger.info("Verifying connectivity and access to Docker API ...")
 
-        # TODO: Validate docker api version >= 1.30
+        # Ensure docker api version >= 1.24
+        version = await self.docker.version()
+        api_version = tuple(map(int, version["ApiVersion"].split(".")))
+        if api_version < (1, 24):
+            raise KaptenError(
+                "Docker API version not supported, {} < 1.24".format(
+                    version["ApiVersion"]
+                )
+            )
 
-        # Test listing tracked services
+        # Verify tracked services
         services = await self.list_services()
 
-        # Test one of the services repository access
+        # Verify access to one of the services repository access
         await self.get_latest_digest(services[0].image)
 
         nof_services = len(services)
@@ -42,7 +50,7 @@ class Kapten:
 
     async def get_latest_digest(self, image):
         # Get latest repository image info
-        data = await self.api.distribution(image)
+        data = await self.docker.distribution(image)
 
         # Locate latest digest
         digest = data["Descriptor"]["digest"]
@@ -51,7 +59,7 @@ class Kapten:
 
     async def list_services(self, image=None):
         # List services
-        services = await self.api.services(name=self.service_names)
+        services = await self.docker.services(name=self.service_names)
 
         # Sort in input order and filter out any non exact matches
         services = sorted(
@@ -100,11 +108,10 @@ class Kapten:
         )
 
         # Update service to latest image digest
-        await self.api.service_update(
+        await self.docker.service_update(
             service.id,
             service.version,
             task_template=new_service["Spec"]["TaskTemplate"],
-            fetch_current_spec=True,
         )
 
         # Notify slack
