@@ -1,17 +1,9 @@
-import asyncio
 import base64
 import copy
 import json
 import os
-import ssl
-import typing
-from functools import wraps
-from urllib.parse import quote_plus, unquote_plus, urljoin
 
 import httpx
-from httpx.concurrency.asyncio import AsyncioBackend, TCPStream
-from httpx.concurrency.base import BaseTCPStream
-from httpx.config import TimeoutConfig
 from httpx.exceptions import ConnectTimeout
 
 from .exceptions import KaptenAPIError, KaptenConnectionError
@@ -74,56 +66,19 @@ class Service(dict):
         return clone
 
 
-def catch_async_error(f):
-    @wraps(f)
-    async def async_wrapper(*args, **kwargs):
-        try:
-            return await f(*args, **kwargs)
-        except ConnectTimeout as e:
-            raise KaptenConnectionError("Docker API Connection Error") from e
-        except Exception as e:
-            raise KaptenAPIError("Docker API Error") from e
-
-    return async_wrapper
-
-
-class AsyncioUnixSocketBackend(AsyncioBackend):
-    async def open_tcp_stream(
-        self,
-        hostname: str,
-        port: int,
-        ssl_context: typing.Optional[ssl.SSLContext],
-        timeout: TimeoutConfig,
-    ) -> BaseTCPStream:
-        try:
-            path = unquote_plus(hostname)
-            stream_reader, stream_writer = await asyncio.wait_for(  # type: ignore
-                asyncio.open_unix_connection(path, ssl=ssl_context),
-                timeout.connect_timeout,
-            )
-        except asyncio.TimeoutError:
-            raise ConnectTimeout()
-
-        return TCPStream(
-            stream_reader=stream_reader, stream_writer=stream_writer, timeout=timeout
-        )
-
-
 class DockerAPIClient:
     def __init__(self, *args, **kwargs):
         host = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
+        base_url = None
+        uds = None
 
         if host.startswith("unix://"):
-            path = quote_plus(host[6:])
-            self.base_url = "http://{}".format(path)
-            self.backend = AsyncioUnixSocketBackend()
-
+            base_url = "http://localhost"
+            uds = host[6:]
         elif host.startswith("tcp://"):
-            self.base_url = host.replace("tcp://", "http://")
-            self.backend = None
+            base_url = host.replace("tcp://", "http://")
 
-    def get_url(self, path):
-        return urljoin(self.base_url, path)
+        self.config = {"base_url": base_url, "uds": uds}
 
     def build_filters_param(self, **filters):
         params = {
@@ -146,72 +101,48 @@ class DockerAPIClient:
             )
         }
 
-    @catch_async_error
+    async def request(self, method, url, params=None, data=None, authenticate=False):
+        async with httpx.Client(**self.config) as client:
+            headers = self.get_auth_header() if authenticate else None
+
+            try:
+                response = await client.request(
+                    method, url, params=params, json=data, headers=headers
+                )
+            except ConnectTimeout as e:
+                raise KaptenConnectionError("Docker API Connection Error") from e
+            except Exception as e:
+                raise KaptenAPIError("Docker API Error: {}".format(str(e))) from e
+
+            if response.status_code >= 400:
+                error = response.json()
+                raise KaptenAPIError("Docker API Error: {}".format(error["message"]))
+
+            return response.json()
+
     async def version(self):
-        async with httpx.AsyncClient(backend=self.backend) as client:
-            url = self.get_url("/version")
-            response = await client.get(url)
-            return response.json()
+        return await self.request("GET", "/version")
 
-    @catch_async_error
-    async def containers(self, **filters):
-        async with httpx.AsyncClient(backend=self.backend) as client:
-            url = self.get_url("/containers/json")
-            params = self.build_filters_param(**filters)
-            response = await client.get(url, params=params)
-            return response.json()
+    # async def containers(self, **filters):
+    # params = self.build_filters_param(**filters)
+    # return await self.request("GET", "/containers/json", params=params)
 
-    @catch_async_error
     async def services(self, **filters):
-        async with httpx.AsyncClient(backend=self.backend) as client:
-            url = self.get_url("/services")
-            params = self.build_filters_param(**filters)
-            response = await client.get(url, params=params)
+        params = self.build_filters_param(**filters)
+        specs = await self.request("GET", "/services", params=params)
+        return [Service(spec) for spec in specs]
 
-            if response.status_code == httpx.codes.INTERNAL_SERVER_ERROR:
-                raise KaptenAPIError("Server Error")
-            elif response.status_code == httpx.codes.SERVICE_UNAVAILABLE:
-                raise KaptenAPIError("Docker node is not part of a swarm")
-
-            specs = response.json()
-            return [Service(spec) for spec in specs]
-
-    @catch_async_error
     async def distribution(self, image):
-        async with httpx.AsyncClient(backend=self.backend) as client:
-            url = self.get_url("/distribution/{name}/json".format(name=image))
-            headers = self.get_auth_header()
-            response = await client.get(url, headers=headers)
+        url = "/distribution/{name}/json".format(name=image)
+        return await self.request("GET", url, authenticate=True)
 
-            if response.status_code == httpx.codes.FORBIDDEN:
-                raise KaptenAPIError("Unauthorized, authentication required")
-            elif response.status_code == httpx.codes.UNAUTHORIZED:
-                raise KaptenAPIError("Failed authentication or no image found")
-            elif response.status_code == httpx.codes.INTERNAL_SERVER_ERROR:
-                raise KaptenAPIError("Server Error")
-
-            distribution = response.json()
-            return distribution
-
-    @catch_async_error
-    async def service_update(
-        self, id_or_name, version, task_template, fetch_current_spec=False
-    ):
+    async def service_update(self, id_or_name, version, task_template):
         # TODO: Implement full post body
+        url = "/services/{id}/update".format(id=id_or_name)
+
+        params = {"version": version}
         data = {"TaskTemplate": task_template}
-        async with httpx.AsyncClient(backend=self.backend) as client:
-            url = self.get_url("/services/{id}/update".format(id=id_or_name))
-            headers = self.get_auth_header()
-            response = await client.post(url, json=data, headers=headers)
 
-            if response.status_code == httpx.codes.BAD_REQUEST:
-                raise KaptenAPIError("Unauthorized, authentication required")
-            elif response.status_code == httpx.codes.NOT_FOUND:
-                raise KaptenAPIError("Unauthorized, authentication required")
-            elif response.status_code == httpx.codes.INTERNAL_SERVER_ERROR:
-                raise KaptenAPIError("Server Error")
-            elif response.status_code == httpx.codes.SERVICE_UNAVAILABLE:
-                raise KaptenAPIError("Docker node is not part of a swarm")
-
-            result = response.json()
-            return result
+        return await self.request(
+            "POST", url, params=params, data=data, authenticate=True
+        )
