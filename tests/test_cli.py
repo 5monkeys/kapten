@@ -154,7 +154,7 @@ class CLICommandTestCase(KaptenTestCase):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(services, "--check")
 
-        with self.mock_docker(with_unsupported_api_version=True):
+        with self.mock_docker(api_version="1.23"):
             with self.assertRaises(SystemExit) as cm:
                 cli.command(argv)
             self.assertEqual(cm.exception.code, 666)

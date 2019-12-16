@@ -74,13 +74,13 @@ class KaptenTestCase(asynctest.TestCase):
     def mock_docker(
         self,
         services=None,
+        api_version="1.40",
         with_missing_services=False,
         with_missing_distribution=False,
         with_new_distribution=True,
         with_api_error=False,
         with_api_exception=False,
         with_auth_header=True,
-        with_unsupported_api_version=False,
     ):
         env = (
             {"DOCKER_USERNAME": "foo", "DOCKER_PASSWORD": "bar"}
@@ -96,9 +96,7 @@ class KaptenTestCase(asynctest.TestCase):
             # Mock version request
             httpx_mock.get(
                 re.compile(r"^http://[^/]+/version$"),
-                content={
-                    "ApiVersion": "1.23" if with_unsupported_api_version else "1.40"
-                },
+                content={"ApiVersion": api_version},
                 alias="version",
             )
 
