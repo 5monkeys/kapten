@@ -1,5 +1,5 @@
 from . import slack
-from .dockerapi import DockerAPIClient
+from .docker import DockerAPIClient
 from .exceptions import KaptenError
 from .log import logger
 
@@ -20,16 +20,26 @@ class Kapten:
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
-        self.api = DockerAPIClient()
+        self.docker = DockerAPIClient()
 
-    def healthcheck(self):
+    async def healthcheck(self):
         logger.info("Verifying connectivity and access to Docker API ...")
 
-        # Test listing tracked services
-        services = self.list_services()
+        # Ensure docker api version >= 1.39
+        version = await self.docker.version()
+        api_version = tuple(map(int, version["ApiVersion"].split(".")))
+        if api_version < (1, 39):
+            raise KaptenError(
+                "Docker API version not supported, {} < 1.39".format(
+                    version["ApiVersion"]
+                )
+            )
 
-        # Test one of the services repository access
-        self.get_latest_digest(services[0].image)
+        # Verify tracked services
+        services = await self.list_services()
+
+        # Verify access to one of the services repository access
+        await self.get_latest_digest(services[0].image)
 
         nof_services = len(services)
         logger.info(
@@ -38,20 +48,18 @@ class Kapten:
 
         return nof_services
 
-    def get_latest_digest(self, image):
-        # Inspect repository image
-        data = self.api.inspect_distribution(image)
+    async def get_latest_digest(self, image):
+        # Get latest repository image info
+        data = await self.docker.distribution(image)
 
         # Locate latest digest
-        digest = data.get("Descriptor", {}).get("digest")
-        if not digest:
-            raise KaptenError("Failed to get latest digest for image: {}".format(image))
+        digest = data["Descriptor"]["digest"]
 
         return digest
 
-    def list_services(self, image=None):
+    async def list_services(self, image=None):
         # List services
-        services = self.api.services(self.service_names)
+        services = await self.docker.services(name=self.service_names)
 
         # Sort in input order and filter out any non exact matches
         services = sorted(
@@ -61,7 +69,7 @@ class Kapten:
 
         # Assert we got the services we asked for
         if len(services) != len(self.service_names):
-            raise KaptenError("Could not find all given services")
+            raise KaptenError("Could not find all tracked services")
 
         # Filter by given image
         if image:
@@ -69,12 +77,12 @@ class Kapten:
 
         return services
 
-    def list_repositories(self):
-        services = self.list_services()
+    async def list_repositories(self):
+        services = await self.list_services()
         repositories = {service.repository for service in services}
         return sorted(repositories)
 
-    def update_service(self, service, digest):
+    async def update_service(self, service, digest):
         logger.debug("Stack:     %s", service.stack or "-")
         logger.debug("Service:   %s", service.short_name)
         logger.debug("Image:     %s", service.image)
@@ -100,11 +108,8 @@ class Kapten:
         )
 
         # Update service to latest image digest
-        self.api.update_service(
-            service.id,
-            service.version,
-            task_template=new_service["Spec"]["TaskTemplate"],
-            fetch_current_spec=True,
+        await self.docker.service_update(
+            service.id, service.version, spec=new_service["Spec"],
         )
 
         # Notify slack
@@ -122,18 +127,20 @@ class Kapten:
 
         return new_service
 
-    def update_services(self, services=None, image=None):
+    async def update_services(self, image=None):
         updated_services = []
 
-        services = services or self.list_services(image=image)
+        # TODO: Run requests in parallel
+        services = await self.list_services(image=image)
         images = {
-            image: self.get_latest_digest(image)
+            image: await self.get_latest_digest(image)
             for image in {service.image for service in services}
         }
 
+        # TODO: Run requests in parallel
         for service in services:
             digest = images[service.image]
-            updated_service = self.update_service(service, digest=digest)
+            updated_service = await self.update_service(service, digest=digest)
             if updated_service:
                 updated_services.append(updated_service)
 

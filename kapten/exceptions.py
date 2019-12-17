@@ -8,3 +8,7 @@ class KaptenClientError(KaptenError):
 
 class KaptenAPIError(KaptenError):
     pass
+
+
+class KaptenConnectionError(KaptenAPIError):
+    pass

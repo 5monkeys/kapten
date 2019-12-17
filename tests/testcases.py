@@ -1,23 +1,25 @@
 import contextlib
 import json
-import unittest
+import os
+import re
+from functools import partial
 from io import StringIO
 from itertools import chain, repeat
 from random import randint
 from unittest import mock
 
+import asynctest
+import httpx
 import responses
+import respx
+from httpx.exceptions import ConnectTimeout
 
-import kapten
 
-
-class KaptenTestCase(unittest.TestCase):
+class KaptenTestCase(asynctest.TestCase):
     def setUp(self):
         # Mock logger
         self.logger_mock = mock.MagicMock()
-        modules = ["cli", "tool", "slack"]
-        if kapten.supports_feature("server"):
-            modules.append("server")
+        modules = ["cli", "tool", "slack", "server"]
         for module in modules:
             mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
             mocker.start()
@@ -29,68 +31,123 @@ class KaptenTestCase(unittest.TestCase):
         argv.extend(args)
         return argv
 
-    def build_service_spec(self, service_name, image_name):
-        stack = service_name.split("_")[0]
+    def build_service_response(self, service_name, image_with_digest):
+        stack = service_name.rpartition("_")[0]
+        labels = {"com.docker.stack.namespace": stack} if stack else {}
         return {
             "ID": str(randint(5555555555, 9999999999)),
             "Version": {"Index": randint(11111, 99999)},
             "Spec": {
                 "Name": service_name,
                 "TaskTemplate": {
-                    "ContainerSpec": {
-                        "Image": image_name,
-                        "Labels": {"com.docker.stack.namespace": stack},
-                    }
+                    "ContainerSpec": {"Image": image_with_digest, "Labels": labels}
                 },
             },
         }
 
+    def build_services_response(self, services):
+        return [
+            self.build_service_response(service_name, image_with_digest)
+            for service_name, image_with_digest in reversed(services)
+        ]
+
+    def build_distribution_response(
+        self, request, services=None, with_new_digest=True, image=None
+    ):
+        digest = "1234567890"
+        if services and image:  # pragma: nocover
+            service_image = [img for _, img in services if img.startswith(image)][0]
+            _, digest = service_image.rsplit(":", 1)
+            if with_new_digest:
+                digest = str(int(digest) + 1)
+
+        return {
+            "Descriptor": {
+                "mediaType": "application/vnd.docker.distribution.manifest.v2+json",
+                "digest": "sha256:" + digest,
+                "size": 12345,
+            },
+            "Platforms": [{"architecture": "amd64", "os": "linux"}],
+        }
+
     @contextlib.contextmanager
-    def mock_docker_api(
+    def mock_docker(
         self,
         services=None,
         with_missing_services=False,
         with_missing_distribution=False,
         with_new_distribution=True,
+        with_api_error=False,
+        with_api_exception=False,
+        with_auth_header=True,
+        with_unsupported_api_version=False,
     ):
-        with mock.patch(
-            "kapten.dockerapi.APIClient.services"
-        ) as services_mock, mock.patch(
-            "kapten.dockerapi.APIClient.inspect_distribution"
-        ) as inspect_distribution_mock, mock.patch(
-            "kapten.dockerapi.APIClient.update_service"
-        ) as update_service_mock, mock.patch(
-            "kapten.dockerapi.APIClient"
-        ) as APIClient:
-            # Mock APIClient.services()
-            APIClient.services = services_mock
-            APIClient.services.return_value = (
-                [
-                    self.build_service_spec(service_name, image_name)
-                    for service_name, image_name in reversed(services)
-                ]
-                if not with_missing_services
-                else []
+        env = (
+            {"DOCKER_USERNAME": "foo", "DOCKER_PASSWORD": "bar"}
+            if with_auth_header
+            else {}
+        )
+        services = services or []
+        with mock.patch.dict(os.environ, env), respx.mock(
+            assert_all_called=False
+        ) as httpx_mock:
+            error_message = {"message": "We've got problem"}
+
+            # Mock version request
+            httpx_mock.get(
+                re.compile(r"^http://[^/]+/version$"),
+                content={
+                    "ApiVersion": "1.23" if with_unsupported_api_version else "1.40"
+                },
+                alias="version",
             )
 
-            # Mock APIClient.inspect_distribution()
-            def mocked_inspect_distribution(image_name, auth_config=None):
-                image = [img for _, img in services if img.startswith(image_name)][0]
-                _, digest = image.rsplit(":", 1)
-                if with_new_distribution:
-                    digest = str(int(digest) + 1)
-                if with_missing_distribution:
-                    return {}
-                return {"Descriptor": {"digest": "sha256:" + digest}}
+            # Mock services request
+            httpx_mock.get(
+                re.compile(r"^http://[^/]+/services\??.*$"),
+                content=(
+                    ConnectTimeout()
+                    if with_api_exception
+                    else self.build_services_response(services)
+                    if not with_missing_services
+                    else []
+                ),
+                alias="version",
+            )
 
-            APIClient.inspect_distribution = inspect_distribution_mock
-            APIClient.inspect_distribution.side_effect = mocked_inspect_distribution
+            # Mock distribution request
+            httpx_mock.get(
+                re.compile(r"^http://[^/]+/distribution/(?P<image>.+/?.*)/json$"),
+                status_code=(
+                    httpx.codes.UNAUTHORIZED
+                    if with_missing_distribution
+                    else httpx.codes.OK
+                ),
+                content=(
+                    error_message
+                    if with_missing_distribution
+                    else partial(
+                        self.build_distribution_response,
+                        services=services,
+                        with_new_digest=with_new_distribution,
+                    )
+                ),
+                alias="distribution",
+            )
 
-            # Mock APIClient.update_service()
-            APIClient.update_service = update_service_mock
-            APIClient.update_service.return_value = {}
+            # Mock service update request
+            httpx_mock.post(
+                re.compile(r"http://[^/]+/services/[0-9]+/update"),
+                status_code=(
+                    httpx.codes.SERVICE_UNAVAILABLE
+                    if with_api_error
+                    else httpx.codes.OK
+                ),
+                content=error_message if with_api_error else {"Warnings": []},
+                alias="service_update",
+            )
 
-            yield APIClient
+            yield httpx_mock
 
     @contextlib.contextmanager
     def mock_slack(self, response="ok", token="token"):

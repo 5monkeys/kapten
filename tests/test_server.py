@@ -1,32 +1,25 @@
 import contextlib
-import unittest
 from unittest import mock
 
 import responses
-from docker.errors import APIError
+from starlette.testclient import TestClient
 
-import kapten
-from kapten import __version__
+from kapten import __version__, server
 from kapten.tool import Kapten
 
 from .testcases import KaptenTestCase
 
-if kapten.supports_feature("server"):
-    from starlette.testclient import TestClient
-    from kapten import server
 
-
-@unittest.skipIf(not kapten.supports_feature("server"), "server mode not supported")
 class ServerTestCase(KaptenTestCase):
     @contextlib.contextmanager
     def mock_server(self, services=None, **kwargs):
         services = services or [("app", "5monkeys/app:latest@sha256:10001")]
-        with self.mock_docker_api(services=services, **kwargs) as docker_client:
+        with self.mock_docker(services=services, **kwargs) as httpx_mock:
             with mock.patch.dict("sys.modules", uvicorn=mock.MagicMock()):
                 client = Kapten([name for name, _ in services])
                 server.run(client, "MY-TOKEN")
-                test_client = TestClient(server.app)
-                yield test_client, docker_client
+                with TestClient(server.app) as test_client:
+                    yield test_client, httpx_mock
 
     @contextlib.contextmanager
     def mock_dockerhub(
@@ -157,8 +150,7 @@ class ServerTestCase(KaptenTestCase):
                 self.assertListEqual(response.json(), [])
 
     def test_dockerhub_endpoint_with_client_error(self):
-        with self.mock_server() as (http, api):
-            api.update_service.side_effect = APIError("Mocked Docker API Error")
+        with self.mock_server(with_api_error=True) as (http, api):
             with self.mock_dockerhub() as payload:
                 response = http.post("/webhook/dockerhub/MY-TOKEN", json=payload)
-                self.assertEqual(response.status_code, 500)
+                self.assertEqual(response.status_code, 503)

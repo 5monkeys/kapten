@@ -4,6 +4,7 @@ from starlette.datastructures import Secret
 from starlette.responses import JSONResponse, Response
 
 from . import __version__, dockerhub
+from .exceptions import KaptenAPIError
 from .log import logger
 from .tool import Kapten
 
@@ -44,8 +45,11 @@ async def dockerhub_webhook(request):
 
     # Update all services matching this image
     try:
-        updated_services = app.state.client.update_services(image=image)
-    except Exception as e:
+        updated_services = await app.state.client.update_services(image=image)
+    except KaptenAPIError as e:
+        logger.warning(e)
+        return Response(status_code=503)
+    except Exception as e:  # pragma: nocover
         logger.error(e)
         return Response(status_code=500)
 
@@ -60,12 +64,16 @@ async def dockerhub_webhook(request):
     )
 
 
+@app.on_event("startup")
+async def setup():
+    app.state.repositories = await app.state.client.list_repositories()
+
+
 def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8800):
     import uvicorn
 
     logger.info("Starting Kapten {} server ...".format(__version__))
     app.state.client = client
     app.state.token = Secret(token)
-    app.state.repositories = client.list_repositories()
 
     uvicorn.run(app, host=host, port=port, proxy_headers=True)
