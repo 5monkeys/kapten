@@ -135,13 +135,10 @@ class DockerAPIClient:
         url = "/distribution/{name}/json".format(name=image)
         return await self.request("GET", url, authenticate=True)
 
-    async def service_update(self, id_or_name, version, task_template):
-        # TODO: Implement full post body
+    async def service_update(self, id_or_name, version, spec):
         url = "/services/{id}/update".format(id=id_or_name)
 
         params = {"version": version}
-        data = {"TaskTemplate": task_template}
-
         return await self.request(
-            "POST", url, params=params, data=data, authenticate=True
+            "POST", url, params=params, data=spec, authenticate=True
         )

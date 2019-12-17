@@ -31,23 +31,23 @@ class KaptenTestCase(asynctest.TestCase):
         argv.extend(args)
         return argv
 
-    def build_services_response(self, services):
-        def spec(service_name, image_with_digest):
-            stack = service_name.rpartition("_")[0]
-            labels = {"com.docker.stack.namespace": stack} if stack else {}
-            return {
-                "ID": str(randint(5555555555, 9999999999)),
-                "Version": {"Index": randint(11111, 99999)},
-                "Spec": {
-                    "Name": service_name,
-                    "TaskTemplate": {
-                        "ContainerSpec": {"Image": image_with_digest, "Labels": labels}
-                    },
+    def build_service_response(self, service_name, image_with_digest):
+        stack = service_name.rpartition("_")[0]
+        labels = {"com.docker.stack.namespace": stack} if stack else {}
+        return {
+            "ID": str(randint(5555555555, 9999999999)),
+            "Version": {"Index": randint(11111, 99999)},
+            "Spec": {
+                "Name": service_name,
+                "TaskTemplate": {
+                    "ContainerSpec": {"Image": image_with_digest, "Labels": labels}
                 },
-            }
+            },
+        }
 
+    def build_services_response(self, services):
         return [
-            spec(service_name, image_with_digest)
+            self.build_service_response(service_name, image_with_digest)
             for service_name, image_with_digest in reversed(services)
         ]
 
@@ -143,7 +143,7 @@ class KaptenTestCase(asynctest.TestCase):
                     if with_api_error
                     else httpx.codes.OK
                 ),
-                content=error_message if with_api_error else [],
+                content=error_message if with_api_error else {"Warnings": []},
                 alias="service_update",
             )
 

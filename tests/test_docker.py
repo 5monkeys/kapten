@@ -1,5 +1,5 @@
+import json
 import os
-import unittest
 from unittest import mock
 
 from kapten.docker import DockerAPIClient
@@ -28,11 +28,23 @@ class DockerAPIClientTestCase(KaptenTestCase):
             image = await api.distribution("foo/bar:baz")
             self.assertEqual(image["Descriptor"]["digest"], "sha256:2")
 
-    @unittest.expectedFailure
     async def test_service_update(self):
-        with self.mock_docker():
-            # TODO: Test service_update
-            self.assertTrue(False)
+        api = DockerAPIClient()
+
+        services = [("foobar", "foo/bar:baz@sha256:1")]
+        with self.mock_docker(services=services) as httpx_mock:
+            service = self.build_service_response("foobar", "foo/bar:baz@sha256:1")
+            service_id = service["ID"]
+            service_version = service["Version"]["Index"]
+            response = await api.service_update(
+                id_or_name=service_id, version=service_version, spec=service["Spec"],
+            )
+            self.assertEqual(response, {"Warnings": []})
+            request, response = httpx_mock["service_update"].calls[0]
+            self.assertIn(service_id, request.url.path)
+            self.assertEqual(request.url.query, f"version={service_version}")
+            request_body = json.loads(request.content.decode("utf-8"))
+            self.assertDictEqual(request_body, service["Spec"])
 
     async def test_auth_header(self):
         api = DockerAPIClient()

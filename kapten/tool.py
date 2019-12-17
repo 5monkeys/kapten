@@ -25,12 +25,12 @@ class Kapten:
     async def healthcheck(self):
         logger.info("Verifying connectivity and access to Docker API ...")
 
-        # Ensure docker api version >= 1.24
+        # Ensure docker api version >= 1.39
         version = await self.docker.version()
         api_version = tuple(map(int, version["ApiVersion"].split(".")))
-        if api_version < (1, 24):
+        if api_version < (1, 39):
             raise KaptenError(
-                "Docker API version not supported, {} < 1.24".format(
+                "Docker API version not supported, {} < 1.39".format(
                     version["ApiVersion"]
                 )
             )
@@ -109,9 +109,7 @@ class Kapten:
 
         # Update service to latest image digest
         await self.docker.service_update(
-            service.id,
-            service.version,
-            task_template=new_service["Spec"]["TaskTemplate"],
+            service.id, service.version, spec=new_service["Spec"],
         )
 
         # Notify slack
