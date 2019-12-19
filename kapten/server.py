@@ -72,7 +72,7 @@ async def setup() -> None:
 def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8800) -> None:
     import uvicorn
 
-    logger.info("Starting Kapten {} server ...".format(__version__))
+    logger.info(f"Starting Kapten {__version__} server ...")
     app.state.client = client
     app.state.token = Secret(token)
 

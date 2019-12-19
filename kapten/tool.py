@@ -32,8 +32,8 @@ class Kapten:
         api_version = tuple(map(int, version["ApiVersion"].split(".")))
         if api_version < (1, 39):
             raise KaptenError(
-                "Docker API version not supported, {} < 1.39".format(
-                    version["ApiVersion"]
+                "Docker API version not supported, {v} < 1.39".format(
+                    v=version["ApiVersion"]
                 )
             )
 

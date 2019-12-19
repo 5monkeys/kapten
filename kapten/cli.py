@@ -78,7 +78,7 @@ def command(input_args: Optional[List[str]] = None) -> None:
 
     # Show version
     if args.show_version:
-        print("Kapten {}".format(__version__))
+        print(f"Kapten {__version__}")
         exit(0)
 
     # Validate required args

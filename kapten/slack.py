@@ -25,9 +25,9 @@ def post(
         payload["attachments"] = [
             {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
         ]
-    response = requests.post(
-        "https://hooks.slack.com/services/{}".format(token), json=payload
-    )
+
+    response = requests.post(f"https://hooks.slack.com/services/{token}", json=payload)
+
     return response.text == "ok"
 
 
@@ -67,7 +67,7 @@ def notify(
     return post(
         token,
         channel=channel,
-        text="Deployment of *{}* has started.".format(project),
-        fallback="Deploying {}, {}".format(service_name, image_digest),
+        text=f"Deployment of *{project}* has started.",
+        fallback=f"Deploying {service_name}, {image_digest}",
         fields=fields,
     )

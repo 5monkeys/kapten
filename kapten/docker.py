@@ -124,7 +124,7 @@ class DockerAPIClient:
             except ConnectTimeout as e:
                 raise KaptenConnectionError("Docker API Connection Error") from e
             except Exception as e:  # pragma: nocover
-                raise KaptenAPIError("Docker API Error: {}".format(str(e))) from e
+                raise KaptenAPIError(f"Docker API Error: {str(e)}") from e
 
             if response.status_code >= 400:
                 message = result["message"] if isinstance(result, dict) else "?"
@@ -154,7 +154,7 @@ class DockerAPIClient:
         return result
 
     async def service_update(self, id_or_name: str, version: int, spec: Dict) -> Dict:
-        url = "/services/{id}/update".format(id=id_or_name)
+        url = f"/services/{id_or_name}/update"
 
         params = {"version": version}
         result = await self.request(
