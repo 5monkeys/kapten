@@ -10,7 +10,9 @@ from .log import logger
 from .tool import Kapten
 
 
-def command(input_args: Optional[List[str]] = None) -> None:
+def command(
+    input_args: Optional[List[str]] = None, disable_healthcheck: bool = False
+) -> None:
     if input_args is None:
         input_args = sys.argv[1:]
 
@@ -105,9 +107,11 @@ def command(input_args: Optional[List[str]] = None) -> None:
     )
 
     try:
-        # Verify kapten can connect and access docker engine and registry
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(client.healthcheck())
+
+        # Verify kapten can connect and access docker engine and registry
+        if not disable_healthcheck:
+            loop.run_until_complete(client.healthcheck())
 
         if hasattr(args, "server") and args.server:
             # Start server

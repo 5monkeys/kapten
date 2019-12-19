@@ -1,8 +1,9 @@
-from typing import List, Optional
+import asyncio
+from typing import Dict, List, Optional
 
 from . import slack
 from .docker import DockerAPIClient, Service
-from .exceptions import KaptenError
+from .exceptions import KaptenAPIError, KaptenError
 from .log import logger
 
 
@@ -40,8 +41,9 @@ class Kapten:
         # Verify tracked services
         services = await self.list_services()
 
-        # Verify access to one of the services repository access
-        await self.get_latest_digest(services[0].image)
+        # Verify access to all service repositories
+        images = list({service.image for service in services})
+        await self.get_latest_digests(images)
 
         nof_services = len(services)
         logger.info(
@@ -58,6 +60,25 @@ class Kapten:
         digest = data["Descriptor"]["digest"]
 
         return digest
+
+    async def get_latest_digests(self, images: List[str]) -> Dict[str, str]:
+        digests = await asyncio.gather(
+            *(self.get_latest_digest(image) for image in images), return_exceptions=True
+        )
+        image_digests = dict(zip(images, digests))
+
+        # Handle failing digists
+        failed_images: Dict[str, Exception] = {
+            image: digest
+            for image, digest in image_digests.items()
+            if isinstance(digest, Exception)
+        }
+        if failed_images:
+            raise KaptenError(
+                f"Failed fetching digests for images: {failed_images.keys()!r}"
+            ) from next(iter(failed_images.values()))
+
+        return image_digests
 
     async def list_services(self, image: Optional[str] = None) -> List[Service]:
         # List services
@@ -114,36 +135,61 @@ class Kapten:
             service.id, service.version, spec=new_service["Spec"]
         )
 
-        # Notify slack
-        if self.slack_token:
-            slack.notify(
-                self.slack_token,
-                service.name,
-                digest,
-                channel=self.slack_channel,
-                project=self.project,
-                stack=service.stack,
-                service_short_name=service.short_name,
-                image=service.image,
-            )
-
         return new_service
 
     async def update_services(self, image: Optional[str] = None) -> List[Service]:
         updated_services = []
 
-        # TODO: Run requests in parallel
+        # List services
         services = await self.list_services(image=image)
-        images = {
-            image: await self.get_latest_digest(image)
-            for image in {service.image for service in services}
-        }
 
-        # TODO: Run requests in parallel
-        for service in services:
-            digest = images[service.image]
-            updated_service = await self.update_service(service, digest=digest)
-            if updated_service:
-                updated_services.append(updated_service)
+        # Fetch latest digests for service's images
+        images = list({service.image for service in services})
+        digests = await self.get_latest_digests(images)
+
+        # Deploy services
+        results = await asyncio.gather(
+            *(
+                self.update_service(service, digest=digests[service.image])
+                for service in services
+            ),
+            return_exceptions=True,
+        )
+        service_names = [service.name for service in services]
+        service_results = dict(zip(service_names, results))
+
+        # Handle failing services
+        failed_services: Dict[str, Exception] = {
+            key: value
+            for key, value in service_results.items()
+            if isinstance(value, Exception)
+        }
+        if failed_services:
+            raise KaptenAPIError(
+                f"Failed updating services: {failed_services.keys()!r}"
+            ) from next(iter(failed_services.values()))
+
+        # Filter updated services
+        updated_services = [
+            service
+            for service in service_results.values()
+            if isinstance(service, Service)
+        ]
+
+        # Notify slack
+        # TODO: Merge service info and post one slack message
+        # TODO: Notify failed services to slack?
+        if self.slack_token:
+            for service in updated_services:
+                slack.notify(
+                    self.slack_token,
+                    service.name,
+                    service.digest,
+                    channel=self.slack_channel,
+                    project=self.project,
+                    stack=service.stack,
+                    service_short_name=service.short_name,
+                    image=service.image,
+                )
 
         return updated_services
