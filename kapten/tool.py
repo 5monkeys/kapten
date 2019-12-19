@@ -3,7 +3,7 @@ from typing import Dict, List, Optional
 
 from . import slack
 from .docker import DockerAPIClient, Service
-from .exceptions import KaptenError
+from .exceptions import KaptenAPIError, KaptenError
 from .log import logger
 
 
@@ -160,11 +160,32 @@ class Kapten:
         digests = await self.get_latest_digests(images)
 
         # Deploy services
-        # TODO: Run requests in parallel
-        for service in services:
-            digest = digests[service.image]
-            updated_service = await self.update_service(service, digest=digest)
-            if updated_service:
-                updated_services.append(updated_service)
+        results = await asyncio.gather(
+            *(
+                self.update_service(service, digest=digests[service.image])
+                for service in services
+            ),
+            return_exceptions=True,
+        )
+        service_names = [service.name for service in services]
+        service_results = dict(zip(service_names, results))
+
+        # Handle failing services
+        failed_services: Dict[str, Exception] = {
+            key: value
+            for key, value in service_results.items()
+            if isinstance(value, Exception)
+        }
+        if failed_services:
+            raise KaptenAPIError(
+                f"Failed updating services: {failed_services.keys()!r}"
+            ) from next(iter(failed_services.values()))
+
+        # Filter updated services
+        updated_services = [
+            service
+            for service in service_results.values()
+            if isinstance(service, Service)
+        ]
 
         return updated_services
