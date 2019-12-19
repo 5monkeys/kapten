@@ -173,6 +173,16 @@ class CLICommandTestCase(KaptenTestCase):
                 self.cli_command(argv, with_healthcheck=True)
             self.assertEqual(cm.exception.code, 666)
 
+    def test_healthcheck_logging(self):
+        services = [("foo", "repo/foo:tag@sha256:0")]
+        argv = self.build_sys_args(services, "--check")
+
+        with self.mock_docker(services, api_version="1.39"):
+            self.cli_command(argv, with_healthcheck=True)
+            self.logger_mock.info.assert_has_calls(
+                [call("Tracking %s service%s", 1, "")], any_order=True
+            )
+
     def test_command_server_not_supported(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
         argv = self.build_sys_args(
