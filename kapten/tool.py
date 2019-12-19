@@ -1,5 +1,7 @@
+from typing import List, Optional
+
 from . import slack
-from .docker import DockerAPIClient
+from .docker import DockerAPIClient, Service
 from .exceptions import KaptenError
 from .log import logger
 
@@ -7,13 +9,13 @@ from .log import logger
 class Kapten:
     def __init__(
         self,
-        service_names,
-        project=None,
-        slack_token=None,
-        slack_channel=None,
-        only_check=False,
-        force=False,
-    ):
+        service_names: List[str],
+        project: Optional[str] = None,
+        slack_token: Optional[str] = None,
+        slack_channel: Optional[str] = None,
+        only_check: bool = False,
+        force: bool = False,
+    ) -> None:
         self.service_names = service_names
         self.project = project
         self.slack_token = slack_token
@@ -22,7 +24,7 @@ class Kapten:
         self.force = force
         self.docker = DockerAPIClient()
 
-    async def healthcheck(self):
+    async def healthcheck(self) -> int:
         logger.info("Verifying connectivity and access to Docker API ...")
 
         # Ensure docker api version >= 1.39
@@ -30,8 +32,8 @@ class Kapten:
         api_version = tuple(map(int, version["ApiVersion"].split(".")))
         if api_version < (1, 39):
             raise KaptenError(
-                "Docker API version not supported, {} < 1.39".format(
-                    version["ApiVersion"]
+                "Docker API version not supported, {v} < 1.39".format(
+                    v=version["ApiVersion"]
                 )
             )
 
@@ -48,7 +50,7 @@ class Kapten:
 
         return nof_services
 
-    async def get_latest_digest(self, image):
+    async def get_latest_digest(self, image: str) -> str:
         # Get latest repository image info
         data = await self.docker.distribution(image)
 
@@ -57,7 +59,7 @@ class Kapten:
 
         return digest
 
-    async def list_services(self, image=None):
+    async def list_services(self, image: Optional[str] = None) -> List[Service]:
         # List services
         services = await self.docker.services(name=self.service_names)
 
@@ -77,12 +79,12 @@ class Kapten:
 
         return services
 
-    async def list_repositories(self):
+    async def list_repositories(self) -> List[str]:
         services = await self.list_services()
         repositories = {service.repository for service in services}
         return sorted(repositories)
 
-    async def update_service(self, service, digest):
+    async def update_service(self, service: Service, digest: str) -> Optional[Service]:
         logger.debug("Stack:     %s", service.stack or "-")
         logger.debug("Service:   %s", service.short_name)
         logger.debug("Image:     %s", service.image)
@@ -90,7 +92,7 @@ class Kapten:
         logger.debug("  Latest:  %s", digest)
 
         if not self.force and digest == service.digest:
-            return
+            return None
 
         # Clone service spec with new image digest
         new_service = service.clone(digest)
@@ -109,7 +111,7 @@ class Kapten:
 
         # Update service to latest image digest
         await self.docker.service_update(
-            service.id, service.version, spec=new_service["Spec"],
+            service.id, service.version, spec=new_service["Spec"]
         )
 
         # Notify slack
@@ -127,7 +129,7 @@ class Kapten:
 
         return new_service
 
-    async def update_services(self, image=None):
+    async def update_services(self, image: Optional[str] = None) -> List[Service]:
         updated_services = []
 
         # TODO: Run requests in parallel

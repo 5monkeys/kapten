@@ -21,7 +21,7 @@ class KaptenTestCase(asynctest.TestCase):
         self.logger_mock = mock.MagicMock()
         modules = ["cli", "tool", "slack", "server"]
         for module in modules:
-            mocker = mock.patch("kapten.{}.logger".format(module), self.logger_mock)
+            mocker = mock.patch(f"kapten.{module}.logger", self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
 

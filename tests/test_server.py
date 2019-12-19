@@ -30,9 +30,7 @@ class ServerTestCase(KaptenTestCase):
         assert_callback=True,
         callback_failure=False,
     ):
-        callback_url = "{}hook/2141b5bi5i5b02bec211i4eeih0242eg11000a/".format(
-            repository_url
-        )
+        callback_url = f"{repository_url}hook/2141b5bi5i5b02bec211i4eeih0242eg11000a/"
         repo_name = repository_name or repository_url.split("/u/")[1].strip("/")
         owner, name = repo_name.split("/")
 

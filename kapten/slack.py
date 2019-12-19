@@ -1,13 +1,20 @@
 import socket
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 
 from .log import logger
 
 
-def post(token, text, fields=None, fallback=None, channel=None):
+def post(
+    token: str,
+    text: str,
+    fields: Optional[List[Dict[str, Any]]] = None,
+    fallback: Optional[str] = None,
+    channel: Optional[str] = None,
+) -> bool:
     logger.debug("Notifying Slack...")
-    payload = {
+    payload: Dict[str, Union[str, List[Dict]]] = {
         "username": "Kapten",
         "icon_url": "https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png",
         "text": text,
@@ -18,13 +25,19 @@ def post(token, text, fields=None, fallback=None, channel=None):
         payload["attachments"] = [
             {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
         ]
-    response = requests.post(
-        "https://hooks.slack.com/services/{}".format(token), json=payload
-    )
+
+    response = requests.post(f"https://hooks.slack.com/services/{token}", json=payload)
+
     return response.text == "ok"
 
 
-def notify(token, service_name, image_digest, channel=None, **kwargs):
+def notify(
+    token: str,
+    service_name: str,
+    image_digest: str,
+    channel: Optional[str] = None,
+    **kwargs: Any,
+) -> bool:
     project = kwargs.get("project", service_name)
     hostname = socket.gethostname()
 
@@ -54,7 +67,7 @@ def notify(token, service_name, image_digest, channel=None, **kwargs):
     return post(
         token,
         channel=channel,
-        text="Deployment of *{}* has started.".format(project),
-        fallback="Deploying {}, {}".format(service_name, image_digest),
+        text=f"Deployment of *{project}* has started.",
+        fallback=f"Deploying {service_name}, {image_digest}",
         fields=fields,
     )

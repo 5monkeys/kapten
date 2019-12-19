@@ -1,9 +1,13 @@
+from typing import Any, Dict, List, Tuple
+
 import requests
 
 from . import __version__
 
 
-def parse_webhook_payload(payload, tracked_repositories):
+def parse_webhook_payload(
+    payload: Dict[str, Any], tracked_repositories: List[str]
+) -> Tuple[str, str]:
     # Validate payload structure
     valid_structure = payload and (
         payload.get("callback_url")
@@ -18,23 +22,23 @@ def parse_webhook_payload(payload, tracked_repositories):
     # Validate repository
     repository = payload["repository"]["repo_name"]
     if repository not in tracked_repositories:
-        raise ValueError("Non-tracked dockerhub repository: {}".format(repository))
+        raise ValueError(f"Non-tracked dockerhub repository: {repository}")
 
     # Validate callback url
     callback_url = payload["callback_url"]
-    repository_url = "https://registry.hub.docker.com/u/{}/hook/".format(repository)
+    repository_url = f"https://registry.hub.docker.com/u/{repository}/hook/"
     if not callback_url.startswith(repository_url):
-        raise ValueError("Invalid dockerhub callback url: {}".format(callback_url))
+        raise ValueError(f"Invalid dockerhub callback url: {callback_url}")
 
     tag = payload["push_data"]["tag"]
-    image = "{}:{}".format(repository, tag)
+    image = f"{repository}:{tag}"
     return image, callback_url
 
 
-def callback(url: str, description: str, state: str = "success"):
+def callback(url: str, description: str, state: str = "success") -> bool:
     payload = {
         "state": state,
-        "context": "Kapten {}".format(__version__),
+        "context": f"Kapten {__version__}",
         "description": description[:255],
     }
     response = requests.post(url, json=payload)

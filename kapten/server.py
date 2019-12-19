@@ -65,14 +65,14 @@ async def dockerhub_webhook(request):
 
 
 @app.on_event("startup")
-async def setup():
+async def setup() -> None:
     app.state.repositories = await app.state.client.list_repositories()
 
 
-def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8800):
+def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8800) -> None:
     import uvicorn
 
-    logger.info("Starting Kapten {} server ...".format(__version__))
+    logger.info(f"Starting Kapten {__version__} server ...")
     app.state.client = client
     app.state.token = Secret(token)
 
