@@ -177,19 +177,13 @@ class Kapten:
         ]
 
         # Notify slack
-        # TODO: Merge service info and post one slack message
         # TODO: Notify failed services to slack?
         if self.slack_token:
-            for service in updated_services:
-                slack.notify(
-                    self.slack_token,
-                    service.name,
-                    service.digest,
-                    channel=self.slack_channel,
-                    project=self.project,
-                    stack=service.stack,
-                    service_short_name=service.short_name,
-                    image=service.image,
-                )
+            slack.notify(
+                self.slack_token,
+                updated_services,
+                project=self.project,
+                channel=self.slack_channel,
+            )
 
         return updated_services

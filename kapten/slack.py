@@ -1,8 +1,10 @@
 import socket
+from itertools import groupby
 from typing import Any, Dict, List, Optional, Union
 
 import requests
 
+from .docker import Service
 from .log import logger
 
 
@@ -33,41 +35,61 @@ def post(
 
 def notify(
     token: str,
-    service_name: str,
-    image_digest: str,
+    services: List[Service],
+    *,
+    project: Optional[str] = None,
     channel: Optional[str] = None,
-    **kwargs: Any,
 ) -> bool:
-    project = kwargs.get("project", service_name)
-    hostname = socket.gethostname()
+    results = []
 
     # Host:
-    fields = [{"title": "Host", "value": hostname, "short": True}]
+    hostname = socket.gethostname()
 
-    # Stack:
-    if "stack" in kwargs:
-        fields.append({"title": "Stack", "value": kwargs["stack"], "short": True})
+    digest_key = lambda s: s.digest
+    grouped_services = groupby(sorted(services, key=digest_key), key=digest_key)
 
-    # Image:
-    if "image" in kwargs:
-        fields.append({"title": "Image", "value": kwargs["image"], "short": True})
+    for digest, digest_services in grouped_services:
+        service_group = list(digest_services)
+        service = service_group[0]
+        digest_project = project or service.stack or service.short_name
 
-    # Service:
-    fields.append(
-        {
-            "title": "Service",
-            "value": kwargs.get("service_short_name", service_name),
-            "short": True,
-        }
-    )
+        fields = [{"title": "Host", "value": hostname, "short": True}]
 
-    # Digest:
-    fields.append({"title": "Digest", "value": image_digest, "short": False})
+        # Stack:
+        stack_names = sorted({s.stack or "(none)" for s in service_group})
+        stack_list = "\n".join(f"\u2022 {name}" for name in stack_names)
+        fields.append(
+            {
+                "title": "Stacks" if len(stack_names) > 1 else "Stack",
+                "value": stack_list,
+                "short": True,
+            }
+        )
 
-    return post(
-        token,
-        channel=channel,
-        text=f"Deployment of *{project}* has started.",
-        fallback=f"Deploying {service_name}, {image_digest}",
-        fields=fields,
-    )
+        # Image:
+        fields.append({"title": "Image", "value": service.image, "short": True})
+
+        # Digest:
+        fields.append({"title": "Digest", "value": digest, "short": False})
+
+        # Service:
+        service_names = sorted(s.short_name for s in service_group)
+        service_list = "\n".join(f"\u2022 {name}" for name in service_names)
+        fields.append(
+            {
+                "title": "Services" if len(service_group) > 1 else "Service",
+                "value": service_list,
+                "short": False,
+            }
+        )
+
+        result = post(
+            token,
+            channel=channel,
+            text=f"Deployment of *{digest_project}* has started.",
+            fallback=f"Deploying {digest_project}, {digest}",
+            fields=fields,
+        )
+        results.append(result)
+
+    return all(results)
