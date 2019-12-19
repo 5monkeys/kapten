@@ -1,13 +1,20 @@
 import socket
+from typing import Any, Dict, List, Optional, Union
 
 import requests
 
 from .log import logger
 
 
-def post(token, text, fields=None, fallback=None, channel=None):
+def post(
+    token: str,
+    text: str,
+    fields: Optional[List[Dict[str, Any]]] = None,
+    fallback: Optional[str] = None,
+    channel: Optional[str] = None,
+) -> bool:
     logger.debug("Notifying Slack...")
-    payload = {
+    payload: Dict[str, Union[str, List[Dict]]] = {
         "username": "Kapten",
         "icon_url": "https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png",
         "text": text,
@@ -24,7 +31,13 @@ def post(token, text, fields=None, fallback=None, channel=None):
     return response.text == "ok"
 
 
-def notify(token, service_name, image_digest, channel=None, **kwargs):
+def notify(
+    token: str,
+    service_name: str,
+    image_digest: str,
+    channel: Optional[str] = None,
+    **kwargs: Any,
+) -> bool:
     project = kwargs.get("project", service_name)
     hostname = socket.gethostname()
 

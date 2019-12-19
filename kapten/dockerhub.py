@@ -1,9 +1,13 @@
+from typing import Any, Dict, List, Tuple
+
 import requests
 
 from . import __version__
 
 
-def parse_webhook_payload(payload, tracked_repositories):
+def parse_webhook_payload(
+    payload: Dict[str, Any], tracked_repositories: List[str]
+) -> Tuple[str, str]:
     # Validate payload structure
     valid_structure = payload and (
         payload.get("callback_url")
@@ -31,7 +35,7 @@ def parse_webhook_payload(payload, tracked_repositories):
     return image, callback_url
 
 
-def callback(url: str, description: str, state: str = "success"):
+def callback(url: str, description: str, state: str = "success") -> bool:
     payload = {
         "state": state,
         "context": "Kapten {}".format(__version__),

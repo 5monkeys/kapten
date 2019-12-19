@@ -2,33 +2,37 @@ import base64
 import copy
 import json
 import os
+from typing import Any, Dict, List, Mapping, Optional, Union
 
 import httpx
 from httpx.exceptions import ConnectTimeout
+from httpx.models import QueryParamTypes
 
 from .exceptions import KaptenAPIError, KaptenConnectionError
+
+Filter = Optional[List[str]]
 
 
 class Service(dict):
     @property
-    def id(self):
+    def id(self) -> str:
         return self["ID"]
 
     @property
-    def version(self):
+    def version(self) -> int:
         return self["Version"]["Index"]
 
     @property
-    def stack(self):
+    def stack(self) -> str:
         labels = self["Spec"]["TaskTemplate"]["ContainerSpec"]["Labels"]
         return labels.get("com.docker.stack.namespace")
 
     @property
-    def name(self):
+    def name(self) -> str:
         return self["Spec"]["Name"]
 
     @property
-    def short_name(self):
+    def short_name(self) -> str:
         name = self.name
         stack = self.stack
         if stack and name.startswith(stack + "_"):
@@ -36,21 +40,21 @@ class Service(dict):
         return self.name
 
     @property
-    def image_with_digest(self):
+    def image_with_digest(self) -> str:
         return self["Spec"]["TaskTemplate"]["ContainerSpec"]["Image"]
 
     @property
-    def image(self):
+    def image(self) -> str:
         image = self.image_with_digest
         return image[: image.rindex("@")]
 
     @property
-    def digest(self):
+    def digest(self) -> str:
         digest = self.image_with_digest
         return digest[digest.rindex("@") + 1 :]
 
     @property
-    def repository(self):
+    def repository(self) -> str:
         repository = self.image
         return repository[: repository.index(":")]
 
@@ -59,7 +63,7 @@ class Service(dict):
     # image = self.image
     # return image[image.index(":") + 1 :]
 
-    def clone(self, digest):
+    def clone(self, digest: str) -> "Service":
         clone = copy.deepcopy(self)
         task_template = clone["Spec"]["TaskTemplate"]
         task_template["ContainerSpec"]["Image"] = "{}@{}".format(self.image, digest)
@@ -67,7 +71,7 @@ class Service(dict):
 
 
 class DockerAPIClient:
-    def __init__(self, *args, **kwargs):
+    def __init__(self) -> None:
         base_url = os.environ.get("DOCKER_HOST", "unix://var/run/docker.sock")
         uds = None
 
@@ -77,17 +81,17 @@ class DockerAPIClient:
         else:
             base_url = base_url.replace("tcp://", "http://")
 
-        self.config = {"base_url": base_url, "uds": uds}
+        self.config: Mapping[str, Any] = {"base_url": base_url, "uds": uds}
 
-    def build_filters_param(self, **filters):
+    def build_filters_param(self, **filters: Filter) -> Optional[Dict[str, str]]:
         params = {
             key: {value: True for value in values}
             for key, values in filters.items()
             if values is not None
         }
-        return {"filters": json.dumps(params)} if params else ""
+        return {"filters": json.dumps(params)} if params else None
 
-    def get_auth_header(self):
+    def get_auth_header(self) -> Dict[str, bytes]:
         username = os.environ.get("DOCKER_USERNAME")
         password = os.environ.get("DOCKER_PASSWORD")
 
@@ -100,45 +104,61 @@ class DockerAPIClient:
             )
         }
 
-    async def request(self, method, url, params=None, data=None, authenticate=False):
+    async def request(
+        self,
+        method: str,
+        url: str,
+        *,
+        params: Optional[QueryParamTypes] = None,
+        data: Optional[Mapping] = None,
+        authenticate: bool = False,
+    ) -> Union[List, Dict]:
         async with httpx.Client(**self.config) as client:
-            headers = self.get_auth_header() if authenticate else None
+            headers = self.get_auth_header() if authenticate else {}
 
             try:
                 response = await client.request(
-                    method, url, params=params, json=data, headers=headers
+                    method, url, params=params or {}, json=data, headers=headers
                 )
+                result = response.json()
             except ConnectTimeout as e:
                 raise KaptenConnectionError("Docker API Connection Error") from e
             except Exception as e:  # pragma: nocover
                 raise KaptenAPIError("Docker API Error: {}".format(str(e))) from e
 
             if response.status_code >= 400:
-                error = response.json()
-                raise KaptenAPIError("Docker API Error: {}".format(error["message"]))
+                message = result["message"] if isinstance(result, dict) else "?"
+                raise KaptenAPIError(f"Docker API Error: {message}")
 
-            return response.json()
+            return result
 
-    async def version(self):
-        return await self.request("GET", "/version")
+    async def version(self) -> Dict:
+        result = await self.request("GET", "/version")
+        assert isinstance(result, dict), "Invalid response"
+        return result
 
-    # async def containers(self, **filters):
+    # async def containers(self, **filters: Filter):
     # params = self.build_filters_param(**filters)
     # return await self.request("GET", "/containers/json", params=params)
 
-    async def services(self, **filters):
+    async def services(self, **filters: Filter) -> List[Service]:
         params = self.build_filters_param(**filters)
-        specs = await self.request("GET", "/services", params=params)
-        return [Service(spec) for spec in specs]
+        result = await self.request("GET", "/services", params=params)
+        assert isinstance(result, list), "Invalid response"
+        return [Service(service) for service in result]
 
-    async def distribution(self, image):
-        url = "/distribution/{name}/json".format(name=image)
-        return await self.request("GET", url, authenticate=True)
+    async def distribution(self, image: str) -> Dict:
+        url = f"/distribution/{image}/json"
+        result = await self.request("GET", url, authenticate=True)
+        assert isinstance(result, dict), "Invalid response"
+        return result
 
-    async def service_update(self, id_or_name, version, spec):
+    async def service_update(self, id_or_name: str, version: int, spec: Dict) -> Dict:
         url = "/services/{id}/update".format(id=id_or_name)
 
         params = {"version": version}
-        return await self.request(
+        result = await self.request(
             "POST", url, params=params, data=spec, authenticate=True
         )
+        assert isinstance(result, dict), "Invalid response"
+        return result
