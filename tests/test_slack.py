@@ -5,7 +5,7 @@ from .testcases import KaptenTestCase
 
 
 class SlackTestCase(KaptenTestCase):
-    def test_notify(self):
+    async def test_notify(self):
         services = [
             Service(
                 self.build_service_response("foo_bar", "repo/foo:tag@sha256:123456789")
@@ -14,12 +14,12 @@ class SlackTestCase(KaptenTestCase):
                 self.build_service_response("baz", "repo/foo:tag@sha256:123456789")
             ),
         ]
-        with self.mock_slack(token="token") as mocked:
-            success = slack.notify(
+        with self.mock_slack(token="token"):
+            success = await slack.notify(
                 "token", services, project="myapp", channel="kapten-deploy"
             )
             self.assertTrue(success)
-            body = self.get_request_body(mocked)
+            body = self.get_request_body("slack")
             self.assertEqual(body["text"], "Deployment of *myapp* has started.")
             self.assertEqual(body["channel"], "kapten-deploy")
 
@@ -30,20 +30,20 @@ class SlackTestCase(KaptenTestCase):
             self.assertEqual(fields[3]["value"], "sha256:123456789")
             self.assertEqual(fields[4]["value"], "\u2022 bar\n\u2022 baz")
 
-    def test_notify_missing_details(self):
+    async def test_notify_missing_details(self):
         service = Service(
             self.build_service_response("foo_bar", "repo/foo:tag@sha256:123456789")
         )
-        with self.mock_slack(token="token") as mocked:
-            success = slack.notify("token", [service])
+        with self.mock_slack(token="token"):
+            success = await slack.notify("token", [service])
             self.assertTrue(success)
-            body = self.get_request_body(mocked)
+            body = self.get_request_body("slack")
             self.assertEqual(body["text"], "Deployment of *foo* has started.")
             self.assertNotIn("channel", body)
 
-    def test_post_without_fields(self):
-        with self.mock_slack(token="token") as mocked:
-            success = slack.post("token", "Hello world")
+    async def test_post_without_fields(self):
+        with self.mock_slack(token="token"):
+            success = await slack.post("token", "Hello world")
             self.assertTrue(success)
-            body = self.get_request_body(mocked)
+            body = self.get_request_body("slack")
             self.assertNotIn("attachments", body)

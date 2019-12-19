@@ -179,7 +179,7 @@ class Kapten:
         # Notify slack
         # TODO: Notify failed services to slack?
         if self.slack_token:
-            slack.notify(
+            await slack.notify(
                 self.slack_token,
                 updated_services,
                 project=self.project,

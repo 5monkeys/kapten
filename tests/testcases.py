@@ -10,7 +10,6 @@ from unittest import mock
 
 import asynctest
 import httpx
-import responses
 import respx
 from httpx.exceptions import ConnectTimeout
 
@@ -24,6 +23,11 @@ class KaptenTestCase(asynctest.TestCase):
             mocker = mock.patch(f"kapten.{module}.logger", self.logger_mock)
             mocker.start()
             self.addCleanup(mocker.stop)
+
+        respx.start()
+
+    def tearDown(self):
+        respx.stop()
 
     def build_sys_args(self, services, *args):
         service_names = [name for name, _ in services]
@@ -88,20 +92,18 @@ class KaptenTestCase(asynctest.TestCase):
             else {}
         )
         services = services or []
-        with mock.patch.dict(os.environ, env), respx.mock(
-            assert_all_called=False
-        ) as httpx_mock:
+        with mock.patch.dict(os.environ, env):
             error_message = {"message": "We've got problem"}
 
             # Mock version request
-            httpx_mock.get(
+            respx.get(
                 re.compile(r"^http://[^/]+/version$"),
                 content={"ApiVersion": api_version},
                 alias="version",
             )
 
             # Mock services request
-            httpx_mock.get(
+            respx.get(
                 re.compile(r"^http://[^/]+/services\??.*$"),
                 content=(
                     ConnectTimeout()
@@ -114,7 +116,7 @@ class KaptenTestCase(asynctest.TestCase):
             )
 
             # Mock distribution request
-            httpx_mock.get(
+            respx.get(
                 re.compile(r"^http://[^/]+/distribution/(?P<image>.+/?.*)/json$"),
                 status_code=(
                     httpx.codes.UNAUTHORIZED
@@ -134,7 +136,7 @@ class KaptenTestCase(asynctest.TestCase):
             )
 
             # Mock service update request
-            httpx_mock.post(
+            respx.post(
                 re.compile(r"http://[^/]+/services/[0-9]+/update"),
                 status_code=(
                     httpx.codes.SERVICE_UNAVAILABLE
@@ -145,25 +147,23 @@ class KaptenTestCase(asynctest.TestCase):
                 alias="service_update",
             )
 
-            yield httpx_mock
+            yield respx.aliases
 
     @contextlib.contextmanager
-    def mock_slack(self, response="ok", token="token"):
-        slack_url = "https://hooks.slack.com/services/%s" % token
-        with responses.RequestsMock() as mock_responses:
-            mock_responses.add(
-                responses.POST,
-                slack_url,
-                body=response,
-                status=200,
-                content_type="text/html",
-            )
-            yield mock_responses
-
-    def get_request_body(self, requests_mock, call_number=1):
-        return json.loads(
-            requests_mock.calls[call_number - 1].request.body.decode("utf-8")
+    def mock_slack(self, text="ok", token="token"):
+        slack_url = f"https://hooks.slack.com/services/{token}"
+        respx.post(
+            slack_url,
+            content=text,
+            status_code=200,
+            content_type="text/html",
+            alias="slack",
         )
+        yield
+
+    def get_request_body(self, alias, call_number=1):
+        calls = respx.aliases[alias].calls
+        return json.loads(calls[call_number - 1][0].content.decode("utf-8"))
 
     @contextlib.contextmanager
     def mock_stdout(self):
