@@ -55,6 +55,10 @@ class DockerAPIClientTestCase(KaptenTestCase):
             request, _ = httpx_mock["distribution"].calls[0]
             self.assertIn("x-registry-auth", request.headers.keys())
 
+    async def test_auth_header_missing(self):
+        api = DockerAPIClient()
+        services = [("foobar", "foo/bar:baz@sha256:1")]
+
         with self.mock_docker(services, with_auth_header=False) as httpx_mock:
             await api.distribution("foo/bar:baz")
             request, _ = httpx_mock["distribution"].calls[0]

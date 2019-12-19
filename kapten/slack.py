@@ -2,13 +2,13 @@ import socket
 from itertools import groupby
 from typing import Any, Dict, List, Optional, Union
 
-import requests
+import httpx
 
 from .docker import Service
 from .log import logger
 
 
-def post(
+async def post(
     token: str,
     text: str,
     fields: Optional[List[Dict[str, Any]]] = None,
@@ -28,12 +28,14 @@ def post(
             {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
         ]
 
-    response = requests.post(f"https://hooks.slack.com/services/{token}", json=payload)
+    response = await httpx.post(
+        f"https://hooks.slack.com/services/{token}", json=payload
+    )
 
     return response.text == "ok"
 
 
-def notify(
+async def notify(
     token: str,
     services: List[Service],
     *,
@@ -83,7 +85,7 @@ def notify(
             }
         )
 
-        result = post(
+        result = await post(
             token,
             channel=channel,
             text=f"Deployment of *{digest_project}* has started.",

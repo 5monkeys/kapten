@@ -27,7 +27,7 @@ class CLICommandTestCase(KaptenTestCase):
             "apa",
         )
 
-        with self.mock_docker(services) as httpx_mock, self.mock_slack() as slack_mock:
+        with self.mock_docker(services) as httpx_mock, self.mock_slack():
             self.cli_command(argv)
 
             service_update_request = httpx_mock["service_update"]
@@ -50,7 +50,7 @@ class CLICommandTestCase(KaptenTestCase):
 
             slack_digest_fields = set()
             for i in range(1, 3):
-                slack_body = self.get_request_body(slack_mock, call_number=i)
+                slack_body = self.get_request_body("slack", call_number=i)
                 self.assertEqual(slack_body["text"], "Deployment of *apa* has started.")
                 self.assertEqual(slack_body["channel"], "deploy")
                 fields = slack_body["attachments"][0]["fields"]
