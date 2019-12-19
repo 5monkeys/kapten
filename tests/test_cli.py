@@ -31,17 +31,18 @@ class CLICommandTestCase(KaptenTestCase):
             self.assertEqual(len(service_update_request.calls), 2)
 
             request1, _ = service_update_request.calls[0]
-            content1 = json.loads(request1.content.decode("utf-8"))
-            self.assertEqual(
-                content1["TaskTemplate"]["ContainerSpec"]["Image"],
-                "repository/app_image:latest@sha256:10002",
-            )
-
             request2, _ = service_update_request.calls[1]
+            content1 = json.loads(request1.content.decode("utf-8"))
             content2 = json.loads(request2.content.decode("utf-8"))
-            self.assertEqual(
-                content2["TaskTemplate"]["ContainerSpec"]["Image"],
-                "repository/db_image:latest@sha256:20002",
+            self.assertSetEqual(
+                {
+                    content1["TaskTemplate"]["ContainerSpec"]["Image"],
+                    content2["TaskTemplate"]["ContainerSpec"]["Image"],
+                },
+                {
+                    "repository/app_image:latest@sha256:10002",
+                    "repository/db_image:latest@sha256:20002",
+                },
             )
 
             for i, expected_digest in enumerate(["sha256:10002", "sha256:20002"], 1):
