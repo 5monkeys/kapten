@@ -25,10 +25,10 @@ class SlackTestCase(KaptenTestCase):
 
             fields = body["attachments"][0]["fields"]
             self.assertIsNotNone(fields[0]["value"])
-            self.assertEqual(fields[1]["value"], "- (none)\n- foo")
+            self.assertEqual(fields[1]["value"], "\u2022 (none)\n\u2022 foo")
             self.assertEqual(fields[2]["value"], "repo/foo:tag")
             self.assertEqual(fields[3]["value"], "sha256:123456789")
-            self.assertEqual(fields[4]["value"], "- bar\n- baz")
+            self.assertEqual(fields[4]["value"], "\u2022 bar\n\u2022 baz")
 
     def test_notify_missing_details(self):
         service = Service(

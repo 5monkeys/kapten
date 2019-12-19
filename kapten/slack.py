@@ -57,7 +57,7 @@ def notify(
 
         # Stack:
         stack_names = sorted({s.stack or "(none)" for s in service_group})
-        stack_list = "\n".join(f"- {name}" for name in stack_names)
+        stack_list = "\n".join(f"\u2022 {name}" for name in stack_names)
         fields.append(
             {
                 "title": "Stacks" if len(stack_names) > 1 else "Stack",
@@ -74,7 +74,7 @@ def notify(
 
         # Service:
         service_names = sorted(s.short_name for s in service_group)
-        service_list = "\n".join(f"- {name}" for name in service_names)
+        service_list = "\n".join(f"\u2022 {name}" for name in service_names)
         fields.append(
             {
                 "title": "Services" if len(service_group) > 1 else "Service",
