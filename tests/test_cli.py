@@ -48,13 +48,16 @@ class CLICommandTestCase(KaptenTestCase):
                 },
             )
 
-            for i, expected_digest in enumerate(["sha256:10002", "sha256:20002"], 1):
+            slack_digest_fields = set()
+            for i in range(1, 3):
                 slack_body = self.get_request_body(slack_mock, call_number=i)
                 self.assertEqual(slack_body["text"], "Deployment of *apa* has started.")
                 self.assertEqual(slack_body["channel"], "deploy")
                 fields = slack_body["attachments"][0]["fields"]
                 digest_field = [f["value"] for f in fields if f["title"] == "Digest"][0]
-                self.assertEqual(digest_field, expected_digest)
+                slack_digest_fields.add(digest_field)
+
+            self.assertSetEqual(slack_digest_fields, {"sha256:10002", "sha256:20002"})
 
     def test_command_verbosity(self):
         services = [("foo", "repo/foo:tag@sha256:0")]
