@@ -134,19 +134,6 @@ class Kapten:
             service.id, service.version, spec=new_service["Spec"]
         )
 
-        # Notify slack
-        if self.slack_token:
-            slack.notify(
-                self.slack_token,
-                service.name,
-                digest,
-                channel=self.slack_channel,
-                project=self.project,
-                stack=service.stack,
-                service_short_name=service.short_name,
-                image=service.image,
-            )
-
         return new_service
 
     async def update_services(self, image: Optional[str] = None) -> List[Service]:
@@ -187,5 +174,21 @@ class Kapten:
             for service in service_results.values()
             if isinstance(service, Service)
         ]
+
+        # Notify slack
+        # TODO: Merge service info and post one slack message
+        # TODO: Notify failed services to slack?
+        if self.slack_token:
+            for service in updated_services:
+                slack.notify(
+                    self.slack_token,
+                    service.name,
+                    service.digest,
+                    channel=self.slack_channel,
+                    project=self.project,
+                    stack=service.stack,
+                    service_short_name=service.short_name,
+                    image=service.image,
+                )
 
         return updated_services
