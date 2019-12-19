@@ -41,8 +41,9 @@ class Kapten:
         # Verify tracked services
         services = await self.list_services()
 
-        # Verify access to one of the services repository access
-        await self.get_latest_digest(services[0].image)
+        # Verify access to all service repositories
+        images = list({service.image for service in services})
+        await self.get_latest_digests(images)
 
         nof_services = len(services)
         logger.info(
