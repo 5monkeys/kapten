@@ -1,4 +1,5 @@
-from typing import List, Optional
+import asyncio
+from typing import Dict, List, Optional
 
 from . import slack
 from .docker import DockerAPIClient, Service
@@ -58,6 +59,25 @@ class Kapten:
         digest = data["Descriptor"]["digest"]
 
         return digest
+
+    async def get_latest_digests(self, images: List[str]) -> Dict[str, str]:
+        digests = await asyncio.gather(
+            *(self.get_latest_digest(image) for image in images), return_exceptions=True
+        )
+        image_digests = dict(zip(images, digests))
+
+        # Handle failing digists
+        failed_images: Dict[str, Exception] = {
+            image: digest
+            for image, digest in image_digests.items()
+            if isinstance(digest, Exception)
+        }
+        if failed_images:
+            raise KaptenError(
+                f"Failed fetching digests for images: {failed_images.keys()!r}"
+            ) from next(iter(failed_images.values()))
+
+        return image_digests
 
     async def list_services(self, image: Optional[str] = None) -> List[Service]:
         # List services
@@ -132,16 +152,17 @@ class Kapten:
     async def update_services(self, image: Optional[str] = None) -> List[Service]:
         updated_services = []
 
-        # TODO: Run requests in parallel
+        # List services
         services = await self.list_services(image=image)
-        images = {
-            image: await self.get_latest_digest(image)
-            for image in {service.image for service in services}
-        }
 
+        # Fetch latest digests for service's images
+        images = list({service.image for service in services})
+        digests = await self.get_latest_digests(images)
+
+        # Deploy services
         # TODO: Run requests in parallel
         for service in services:
-            digest = images[service.image]
+            digest = digests[service.image]
             updated_service = await self.update_service(service, digest=digest)
             if updated_service:
                 updated_services.append(updated_service)
