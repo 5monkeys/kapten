@@ -162,3 +162,21 @@ class DockerAPIClient:
         )
         assert isinstance(result, dict), "Invalid response"
         return result
+
+    async def events(self, since: Optional[int] = None, **filters: Filter):
+        async with httpx.Client(**self.config) as client:
+            params = self.build_filters_param(**filters)
+            if since:
+                params["since"] = since
+
+            async with client.stream(
+                "GET", "/events", params=params, timeout=None
+            ) as response:
+                # TODO: Remove header patch once httpx stream api handles < 4096
+                #       https://github.com/encode/httpx/blob/master/httpx/decoders.py#L181
+                if response.headers["content-type"] == "application/json":
+                    response.headers["content-type"] = "application/json; charset=utf-8"
+
+                async for line in response.aiter_lines():
+                    event = json.loads(line)
+                    yield event
