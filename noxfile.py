@@ -17,7 +17,7 @@ def test(session):
         "pytest-cov",
         "asynctest",
         "respx>=0.8.1",
-        "responses",
+        "requests",  # needed by starlette test client
     )
     session.install("-e", ".[server]")
 
