@@ -47,7 +47,7 @@ class Kapten:
 
         nof_services = len(services)
         logger.info(
-            "Tracking {} service{}", nof_services, "s" if nof_services > 1 else ""
+            "Tracking %s service%s", nof_services, "s" if nof_services > 1 else ""
         )
 
         return nof_services
