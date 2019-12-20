@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional
 
 from . import slack
 from .docker import DockerAPIClient, Service
@@ -24,6 +24,7 @@ class Kapten:
         self.only_check = only_check
         self.force = force
         self.docker = DockerAPIClient()
+        self.subscriptions = []
 
     async def healthcheck(self) -> int:
         logger.info("Verifying connectivity and access to Docker API ...")
@@ -194,8 +195,77 @@ class Kapten:
         return updated_services
 
     def listen(self):
-        asyncio.create_task(self.handle_events())
+        asyncio.ensure_future(self.handle_events())
 
     async def handle_events(self):
+        """
+        {
+            "Type": "service",
+            "Action": "update",
+            "Actor": {
+                "ID": "udb7rusq91ob0uhi337v2f2ro",
+                "Attributes": {
+                    "name": "toborrow-kapten-dev_kapten",
+                    "updatestate.new": "completed",
+                    "updatestate.old": "updating",
+                },
+            },
+            "scope": "swarm",
+            "time": 1576850575,
+            "timeNano": 1576850575170197441,
+        }
+        """
         async for event in self.docker.events(type=["service"], event=["update"]):
-            logger.info("Docker Service Event: %r", event)
+            try:
+                done_subscription_index = None
+                for i, (subscription, _) in enumerate(self.subscriptions):
+                    for rule in subscription:
+                        matched = rule.match(event)
+                        if matched:
+                            break
+                    if all(rule.completed for rule in subscription):
+                        done_subscription_index = i
+                        break
+
+                if done_subscription_index is not None:
+                    logger.info("All Services Deploymed!")
+                    _, callback = self.subscriptions.pop(done_subscription_index)
+                    callback()
+
+            except Exception as e:
+                logger.error("Failed to log event :-( %r", e, exc_info=True)
+
+    def subscribe(self, services: List[Service], callback: Callable):
+        rules = [
+            ServiceUpdateRule(service=service.name, image=service.image_with_digest)
+            for service in services
+        ]
+        self.subscriptions.append((rules, callback))
+
+
+class ServiceUpdateRule:
+    def __init__(self, service, image):
+        self.service = service
+        self.image = image
+        self.checks = set()
+        self.completed = False
+
+    def match(self, event):
+        attributes = event["Actor"]["Attributes"]
+        service_name = attributes["name"]
+
+        if service_name != self.name:
+            return False
+
+        image = attributes.get("image.new")
+        state = attributes.get("updatestate.new")
+
+        if image == self.image:
+            self.checks.add("image")
+            logger.info(f"Got image for service: {self.service}")
+        elif state and "image" in self.checks:
+            self.checks.add("state")
+            self.deployed = True
+            logger.info(f"Service deployed: {self.service}")
+
+        return True

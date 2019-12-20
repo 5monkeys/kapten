@@ -111,6 +111,11 @@ async def github_webhook(request):
     if not updated_services:
         logger.debug("No service(s) updated for image: %s", image)
 
+    def callback():
+        logger.info("GitHub callback triggered")
+
+    app.state.client.subscribe(updated_services, callback=callback)
+
     return JSONResponse(
         [
             {"service": service.name, "image": service.image_with_digest}
