@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Tuple
 
-import requests
+import httpx
 
 from . import __version__
 
@@ -35,11 +35,11 @@ def parse_webhook_payload(
     return image, callback_url
 
 
-def callback(url: str, description: str, state: str = "success") -> bool:
+async def callback(url: str, description: str, state: str = "success") -> bool:
     payload = {
         "state": state,
         "context": f"Kapten {__version__}",
         "description": description[:255],
     }
-    response = requests.post(url, json=payload)
-    return response.ok
+    response = await httpx.post(url, json=payload)
+    return not response.is_error

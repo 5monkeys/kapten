@@ -38,7 +38,7 @@ async def dockerhub_webhook(request):
         return Response(status_code=404)
 
     # Call back to dockerhub to verify legit webhook
-    acked = dockerhub.callback(callback_url, "Valid webhook received")
+    acked = await dockerhub.callback(callback_url, "Valid webhook received")
     if not acked:
         logger.critical("Failed to call back to dockerhub on url: %s", callback_url)
         return Response(status_code=400)
