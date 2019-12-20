@@ -122,6 +122,7 @@ async def github_webhook(request):
 @app.on_event("startup")
 async def setup() -> None:
     app.state.repositories = await app.state.client.list_repositories()
+    app.state.client.listen()
 
 
 def run(client: Kapten, token: str, host: str = "0.0.0.0", port: int = 8800) -> None:

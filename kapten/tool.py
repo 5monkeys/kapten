@@ -192,3 +192,10 @@ class Kapten:
             )
 
         return updated_services
+
+    def listen(self):
+        asyncio.create_task(self.handle_events())
+
+    async def handle_events(self):
+        async for event in self.docker.events(type=["service"], event=["update"]):
+            logger.info("Docker Service Event: %r", event)
