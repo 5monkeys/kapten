@@ -3,7 +3,7 @@ from starlette.config import Config
 from starlette.datastructures import Secret
 from starlette.responses import JSONResponse, Response
 
-from . import __version__, dockerhub
+from . import __version__, dockerhub, github
 from .exceptions import KaptenAPIError
 from .log import logger
 from .tool import Kapten
@@ -44,6 +44,61 @@ async def dockerhub_webhook(request):
         return Response(status_code=400)
 
     # Update all services matching this image
+    try:
+        updated_services = await app.state.client.update_services(image=image)
+    except KaptenAPIError as e:
+        logger.warning(e)
+        return Response(status_code=503)
+    except Exception as e:  # pragma: nocover
+        logger.error(e)
+        return Response(status_code=500)
+
+    if not updated_services:
+        logger.debug("No service(s) updated for image: %s", image)
+
+    return JSONResponse(
+        [
+            {"service": service.name, "image": service.image_with_digest}
+            for service in updated_services
+        ]
+    )
+
+
+@app.route("/webhook/github", methods=["POST"])
+async def github_webhook(request):
+    logger.info("Received GitHub webhook from: %s", request.client.host)
+
+    # Validate event type
+    event_type = request.headers.get("x-github-event") or ""
+    if event_type.lower() not in ("deployment", "ping"):
+        logger.debug(f"Responding to unwanted GitHub event: {event_type}")
+        return Response("Event not handled by Kapten", status_code=404)
+
+    # Validate signature
+    signature = request.headers.get("x-hub-signature") or ""
+    request_body = await request.body()  # NOTE: Comes as bytes
+    if not github.validate_signature(app.state.token, request_body, signature):
+        logger.critical("Invalid GitHub signature")
+        return Response(status_code=404)
+
+    if event_type.lower() == "ping":
+        logger.debug("Responding to ping event")
+        return Response("Pong", status_code=202)
+
+    payload = await request.json()
+    repositories = app.state.repositories
+    # Parse payload
+    try:
+        image, callback_url = github.parse_webhook_payload(payload, repositories)
+    except ValueError as e:
+        logger.critical(e)
+        return Response(status_code=404)
+
+    # TODO: Schedule update service
+    # TODO: Respond with success to webhook (GitHub only waits for 10 sec for response)
+    # TODO: Post deployment status "in_progress" to GitHub
+
+    # Update all services matching this deploy
     try:
         updated_services = await app.state.client.update_services(image=image)
     except KaptenAPIError as e:

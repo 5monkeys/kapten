@@ -96,6 +96,7 @@ class Kapten:
 
         # Filter by given image
         if image:
+            # TODO: Filter with regex match instead of exact match
             services = list(filter(lambda s: s.image == image, services))
 
         return services
@@ -137,15 +138,19 @@ class Kapten:
 
         return new_service
 
-    async def update_services(self, image: Optional[str] = None) -> List[Service]:
+    async def update_services(self, image: str = "") -> List[Service]:
         updated_services = []
 
         # List services
+        image, _, digest = image.partition("@")
         services = await self.list_services(image=image)
 
-        # Fetch latest digests for service's images
-        images = list({service.image for service in services})
-        digests = await self.get_latest_digests(images)
+        if not digest:
+            # Fetch latest digests for service's images
+            images = list({service.image for service in services})
+            digests = await self.get_latest_digests(images)
+        else:
+            digests = {service.image: digest for service in services}
 
         # Deploy services
         results = await asyncio.gather(

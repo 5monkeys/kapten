@@ -165,6 +165,10 @@ class KaptenTestCase(asynctest.TestCase):
         calls = respx.aliases[alias].calls
         return json.loads(calls[call_number - 1][0].content.decode("utf-8"))
 
+    def get_request_headers(self, alias, call_number=1):
+        calls = respx.aliases[alias].calls
+        return calls[call_number - 1][0].headers
+
     @contextlib.contextmanager
     def mock_stdout(self):
         with mock.patch("sys.stdout", StringIO()) as stdout:
