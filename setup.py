@@ -35,5 +35,5 @@ setup(
     entry_points={"console_scripts": ["kapten = kapten.cli:command"]},
     python_requires=">=3.6",
     install_requires=["httpx>=0.9.3,<0.9.4"],
-    extras_require={"server": ["uvicorn>=0.10.3,<0.11", "starlette>=0.12.13,<0.13"]},
+    extras_require={"server": ["uvicorn>=0.10.3,<0.10.9", "starlette>=0.12.13,<0.13"]},
 )
