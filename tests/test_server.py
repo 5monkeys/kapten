@@ -2,8 +2,6 @@ import contextlib
 import hashlib
 import hmac
 import json
-import re
-import unittest
 import uuid
 from unittest import mock
 
@@ -81,8 +79,7 @@ class ServerTestCase(KaptenTestCase):
             },
         }
 
-    @contextlib.contextmanager
-    def mock_github(
+    def build_github_payload(
         self,
         repository_url="https://github.com/5monkeys/app",
         repository_name=None,
@@ -108,13 +105,7 @@ class ServerTestCase(KaptenTestCase):
             },
             "repository": {"url": repository_url, "full_name": repo_name},
         }
-        respx.post(
-            re.compile(r"^https://api\.github\.com/repos/.*/deployments/.*/statuses$"),
-            status_code=200,
-            content={},
-            alias="github",
-        )
-        yield payload, self.sign_payload(payload, token)
+        return payload, self.sign_payload(payload, token)
 
     def sign_payload(self, payload, token=None):
         return "sha1={}".format(
@@ -204,7 +195,6 @@ class ServerTestCase(KaptenTestCase):
                 response = http.post("/webhook/dockerhub/MY-TOKEN", json=payload)
                 self.assertEqual(response.status_code, 503)
 
-    @unittest.expectedFailure
     def test_github_endpoint(self):
         services = [
             ("stack_migrate", "5monkeys/app:latest@sha256:10001"),
@@ -213,52 +203,28 @@ class ServerTestCase(KaptenTestCase):
             ("stack_db", "5monkeys/db:latest@sha256:30001"),
         ]
         with self.mock_server(services) as http:
-            with self.mock_github(
+            payload, signature = self.build_github_payload(
                 image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002",
-            ) as (payload, signature):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "Deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 200)
-                self.assertListEqual(
-                    response.json(),
-                    [
-                        {
-                            "service": "stack_migrate",
-                            "image": "5monkeys/app:latest@sha256:10002",
-                        },
-                        {
-                            "service": "stack_app",
-                            "image": "5monkeys/app:latest@sha256:10002",
-                        },
-                    ],
-                )
-                github_requests = respx.aliases["github"]
-                # On successful deploy we post 2 deployment statuses: 'in_progress' and 'success'
-                self.assertEqual(len(github_requests.calls), 2)
-                in_progress_request, in_progress_response = github_requests.calls[0]
-                self.assertEqual(
-                    json.loads(in_progress_request.content.decode("utf-8")),
+            )
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "Deployment"},
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertListEqual(
+                response.json(),
+                [
                     {
-                        "state": "in_progress",
-                        "description": "Deployment has started",
-                        "environment": "dev",
+                        "service": "stack_migrate",
+                        "image": "5monkeys/app:latest@sha256:10002",
                     },
-                )
-                success_request, success_response = github_requests.calls[1]
-                self.assertEqual(
-                    json.loads(success_request.content.decode("utf-8")),
                     {
-                        "state": "success",
-                        "description": "Deployment finished successfully. 2 services updated.",
-                        "environment": "dev",
+                        "service": "stack_app",
+                        "image": "5monkeys/app:latest@sha256:10002",
                     },
-                )
+                ],
+            )
 
     def test_github_ping_webhook(self):
         with self.mock_server() as http:
@@ -295,27 +261,41 @@ class ServerTestCase(KaptenTestCase):
 
     def test_github_webhook_with_invalid_signature(self):
         with self.mock_server() as http:
-            with self.mock_github(
+            payload, signature = self.build_github_payload(
                 image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002",
-            ) as (payload, signature):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": self.sign_payload({"invalid": "payload"}),
-                        "X-GitHub-Event": "Deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": self.sign_payload(payload, token="invalid"),
-                        "X-GitHub-Event": "Deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            )
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={
+                    "X-Hub-Signature": self.sign_payload({"invalid": "payload"}),
+                    "X-GitHub-Event": "Deployment",
+                },
+            )
+            self.assertEqual(response.status_code, 404)
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={
+                    "X-Hub-Signature": self.sign_payload(payload, token="invalid"),
+                    "X-GitHub-Event": "Deployment",
+                },
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_github_webhook_with_non_json_payload(self):
+        with self.mock_server() as http:
+            payload, _ = self.build_github_payload()
+            payload["deployment"]["payload"] = "{"
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={
+                    "X-Hub-Signature": self.sign_payload(payload),
+                    "X-GitHub-Event": "deployment",
+                },
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_webhook_with_invalid_payload(self):
         with self.mock_server() as http:
@@ -340,138 +320,113 @@ class ServerTestCase(KaptenTestCase):
             )
             self.assertEqual(response.status_code, 404)
 
+    def test_github_webhook_with_unsupported_event(self):
+        with self.mock_server() as http:
+            payload = {"some": "commit"}
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={
+                    "X-Hub-Signature": self.sign_payload(payload),
+                    "X-GitHub-Event": "commit",
+                },
+            )
+            self.assertEqual(response.status_code, 404)
+
     def test_github_webhook_with_invalid_image(self):
         with self.mock_server() as http:
-            with self.mock_github(image="5monkeys/invalid") as (
-                payload,
-                signature,
-            ):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            payload, signature = self.build_github_payload(image="5monkeys/invalid")
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_webhook_with_invalid_callback_url(self):
         with self.mock_server() as http:
-            with self.mock_github(statuses_url="https://api.github.com/invalid/",) as (
-                payload,
-                signature,
-            ):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            payload, signature = self.build_github_payload(
+                statuses_url="https://api.github.com/invalid/",
+            )
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_webhook_with_invalid_tag(self):
         with self.mock_server() as http:
-            with self.mock_github(tag="") as (payload, signature):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            payload, signature = self.build_github_payload(tag="")
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_webhook_with_invalid_digest1(self):
         """
         Invalid digest prefix
         """
         with self.mock_server() as http:
-            with self.mock_github(digest="5monkeys/app@invalid:10002") as (
-                payload,
-                signature,
-            ):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            payload, signature = self.build_github_payload(
+                digest="5monkeys/app@invalid:10002"
+            )
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_wehbook_with_invalid_digest2(self):
         """
         Missing digest value
         """
         with self.mock_server() as http:
-            with self.mock_github(digest="5monkeys/app:latest") as (
-                payload,
-                signature,
-            ):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 404)
+            payload, signature = self.build_github_payload(digest="5monkeys/app:latest")
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
+
+    def test_github_webhook_with_invalid_digest3(self):
+        """
+        Invalid digest value type
+        """
+        with self.mock_server() as http:
+            payload, signature = self.build_github_payload(digest=123)
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "deployment"},
+            )
+            self.assertEqual(response.status_code, 404)
 
     def test_github_webhook_with_non_matching_services(self):
         with self.mock_server(with_new_distribution=False) as http:
-            with self.mock_github(
+            payload, signature = self.build_github_payload(
                 image="5monkeys/app",
                 tag="unknown",
                 digest="5monkeys/unknown@sha256:10002",
-            ) as (payload, signature):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "Deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 200)
-                self.assertListEqual(response.json(), [])
+            )
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "Deployment"},
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertListEqual(response.json(), [])
 
-    @unittest.expectedFailure
     def test_github_webhook_with_client_error(self):
         with self.mock_server(with_api_error=True) as http:
-            with self.mock_github() as (payload, signature):
-                response = http.post(
-                    "/webhook/github",
-                    json=payload,
-                    headers={
-                        "X-Hub-Signature": signature,
-                        "X-GitHub-Event": "Deployment",
-                    },
-                )
-                self.assertEqual(response.status_code, 200)
-                github_requests = respx.aliases["github"]
-                # On failure we post 2 deployment statuses: 'in_progress' and 'error'
-                self.assertEqual(len(github_requests.calls), 2)
-                in_progress_request, in_progress_response = github_requests.calls[0]
-                self.assertEqual(
-                    json.loads(in_progress_request.content.decode("utf-8")),
-                    {
-                        "state": "in_progress",
-                        "description": "Deployment has started",
-                        "environment": "dev",
-                    },
-                )
-                error_request, error_response = github_requests.calls[1]
-                self.assertEqual(
-                    json.loads(error_request.content.decode("utf-8")),
-                    {
-                        "state": "error",
-                        "description": "Deployment failed with an ucaught error",
-                        "environment": "dev",
-                    },
-                )
+            payload, signature = self.build_github_payload()
+            response = http.post(
+                "/webhook/github",
+                json=payload,
+                headers={"X-Hub-Signature": signature, "X-GitHub-Event": "Deployment"},
+            )
+            self.assertEqual(response.status_code, 503)

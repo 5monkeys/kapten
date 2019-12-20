@@ -3,6 +3,7 @@ import hmac
 import json
 from typing import Any, Dict, List, Tuple, Union
 
+import httpx
 from starlette.datastructures import Secret
 
 from .log import logger
@@ -42,9 +43,6 @@ def parse_webhook_payload(
             "deployment" in payload,
             "statuses_url" in payload.get("deployment", {}),
             "payload" in payload.get("deployment", {}),
-            "digest" in payload.get("deployment", {}).get("payload", {}),
-            "tag" in payload.get("deployment", {}).get("payload", {}),
-            "image" in payload.get("deployment", {}).get("payload", {}),
             "repository" in payload,
             "full_name" in payload.get("repository", {}),
         ]
@@ -52,25 +50,83 @@ def parse_webhook_payload(
     if not valid_structure:
         raise ValueError("Invalid GitHub payload")
 
-    deployment_payload = json.loads(payload["deployment"]["payload"])
+    try:
+        deployment_payload = json.loads(payload["deployment"]["payload"])
+    except json.JSONDecodeError:
+        raise ValueError("Supplied deployment payload is not valid JSON")
+
+    valid_deployment_payload_structure = deployment_payload and all(
+        [
+            "digest" in deployment_payload,
+            "tag" in deployment_payload,
+            "image" in deployment_payload,
+            isinstance(deployment_payload["digest"], str),
+            isinstance(deployment_payload["tag"], str),
+            isinstance(deployment_payload["image"], str),
+        ]
+    )
+    if not valid_deployment_payload_structure:
+        raise ValueError("Invalid deployment payload")
+
     image = deployment_payload["image"]
     if image not in tracked_repositories:
-        raise ValueError("No image value")
+        raise ValueError(f"Supplied image in deployment payload not tracked: {image}")
 
     callback_url = payload["deployment"]["statuses_url"]
     if not callback_url.startswith("https://api.github.com/repos/"):
-        raise ValueError("Invalid GitHub callback url: {}".format(callback_url))
+        raise ValueError(f"Invalid GitHub callback URL: {callback_url}")
 
     tag = deployment_payload["tag"]
     if not tag:
-        raise ValueError("No tag value")
+        raise ValueError("Missing tag in deployment payload")
 
     # Format: <IMAGE>@<DIGEST> where DIGEST is prefixed with: 'sha256' expected
-    digest = deployment_payload["digest"]
-    if "@" not in digest:
-        raise ValueError("Invalid digest value: {}".format(digest))
-    digest = digest.split("@")[1]
-    if not digest.startswith("sha256:"):
-        raise ValueError("Invalid digest value: {}".format(digest))
+    _, separator, digest = deployment_payload["digest"].rpartition("@")
+    if not separator or not digest.startswith("sha256:"):
+        raise ValueError(
+            "Invalid deployment payload digest value: {}".format(
+                deployment_payload["digest"]
+            )
+        )
 
     return f"{image}:{tag}@{digest}", callback_url
+
+
+async def callback(url: str, state: str, environment: str, description: str) -> bool:
+    # TODO: Also accept: 'log_url', 'environment_url'
+    # TODO: Authentication (token?) for GitHub API
+    valid_states = {
+        "error",
+        "failure",
+        "inactive",
+        "in_progress",
+        "queued",
+        "pending",
+        "success",
+    }
+    if state not in valid_states:
+        raise ValueError(f"Invalid state: {state}")
+
+    # Header required for state: "in_progress" and "queued" as well as
+    # the "environment" parameter. See:
+    #   https://developer.github.com/v3/repos/deployments/#create-a-deployment-status
+    headers = {"Accept": "application/vnd.github.flash-preview+json"}
+    data = {
+        "state": state,
+        "description": description,
+        "environment": environment,
+    }
+    async with httpx.Client(headers=headers) as client:
+        try:
+            response = await client.request("POST", url, json=data)
+        except Exception as e:  # pragma: nocover
+            # TODO: Retry
+            logger.critical(e)
+            return False
+
+        if response.is_error:
+            error = response.json()
+            logger.critical("Error response from GitHub: %r", error)
+            return False
+
+        return True

@@ -70,9 +70,9 @@ async def github_webhook(request):
 
     # Validate event type
     event_type = request.headers.get("x-github-event") or ""
-    if event_type.lower() != "deployment":
-        logger.debug("Responding to unwanted GitHub event: {}".format(event_type))
-        return Response("Event not handled by Kapten", status_code=202)
+    if event_type.lower() not in ("deployment", "ping"):
+        logger.debug(f"Responding to unwanted GitHub event: {event_type}")
+        return Response("Event not handled by Kapten", status_code=404)
 
     # Validate signature
     signature = request.headers.get("x-hub-signature") or ""
@@ -80,6 +80,10 @@ async def github_webhook(request):
     if not github.validate_signature(app.state.token, request_body, signature):
         logger.critical("Invalid GitHub signature")
         return Response(status_code=404)
+
+    if event_type.lower() == "ping":
+        logger.debug("Responding to ping event")
+        return Response("Pong", status_code=202)
 
     payload = await request.json()
     repositories = app.state.repositories
