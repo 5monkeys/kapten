@@ -1,3 +1,4 @@
+import asyncio
 import socket
 from itertools import groupby
 from typing import Any, Dict, List, Optional, Union
@@ -16,23 +17,37 @@ async def post(
     channel: Optional[str] = None,
 ) -> bool:
     logger.debug("Notifying Slack...")
+
+    channels: List[Optional[str]] = []
+
+    if channel is not None:
+        channels = [c.strip() for c in channel.split(",")]
+    else:
+        channels = [None]
+
     payload: Dict[str, Union[str, List[Dict]]] = {
         "username": "Kapten",
         "icon_url": "https://raw.githubusercontent.com/5monkeys/kapten/master/kapten.png",
         "text": text,
     }
-    if channel:
-        payload["channel"] = channel
-    if fields:
-        payload["attachments"] = [
-            {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
-        ]
 
-    response = await httpx.post(
-        f"https://hooks.slack.com/services/{token}", json=payload
-    )
+    posts = []
+    for channel in channels:
+        if channel:
+            payload["channel"] = channel
 
-    return response.text == "ok"
+        if fields:
+            payload["attachments"] = [
+                {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
+            ]
+
+        posts.append(
+            httpx.post(f"https://hooks.slack.com/services/{token}", json=payload)
+        )
+
+    responses = await asyncio.gather(*posts, return_exceptions=True)
+
+    return all([response.text == "ok" for response in responses])
 
 
 async def notify(
