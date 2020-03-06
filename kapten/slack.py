@@ -31,19 +31,21 @@ async def post(
         "text": text,
     }
 
+    if fields:
+        payload["attachments"] = [
+            {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
+        ]
+
     posts = []
     for channel in channels:
         if channel:
             payload["channel"] = channel
 
-        if fields:
-            payload["attachments"] = [
-                {"color": "#50ba32", "fallback": fallback or text, "fields": fields}
-            ]
-
         posts.append(
             httpx.post(f"https://hooks.slack.com/services/{token}", json=payload)
         )
+
+        payload.pop("channels", None)
 
     responses = await asyncio.gather(*posts, return_exceptions=True)
 
