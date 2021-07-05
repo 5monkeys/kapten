@@ -23,3 +23,10 @@ coverage.xml
 # Editor config
 .idea
 .tags
+
+# Emacs
+*~
+\#*\#
+\.#*
+.#*.*
+*_flymake*

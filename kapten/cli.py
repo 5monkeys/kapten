@@ -67,7 +67,17 @@ def command(
         action="store_true",
         help="Only check if service needs to be updated.",
     )
-    parser.add_argument("--force", action="store_true", help="Force service update.")
+    # This is not really Force. Rename to skip digest verification for ex
+    parser.add_argument(
+        "--force", action="store_true", help="Skips image digest verification."
+    )
+
+    parser.add_argument(
+        "--force-update",
+        action="store_true",
+        help="Passes ForceUpdate to service update request.",
+    )
+
     parser.add_argument(
         "-v",
         "--verbosity",
@@ -104,6 +114,7 @@ def command(
         slack_channel=args.slack_channel,
         only_check=args.check,
         force=args.force,
+        force_update=args.force_update,
     )
 
     try:
@@ -134,7 +145,8 @@ def command(
 def has_feature(name: str) -> bool:
     if name == "server":  # pragma: nocover
         try:
-            import uvicorn, starlette  # noqa
+            import starlette  # noqa
+            import uvicorn  # noqa
         except ImportError:
             pass
         else:
