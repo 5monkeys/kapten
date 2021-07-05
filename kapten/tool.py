@@ -16,6 +16,7 @@ class Kapten:
         slack_channel: Optional[str] = None,
         only_check: bool = False,
         force: bool = False,
+        force_update: bool = False,
     ) -> None:
         self.service_names = service_names
         self.project = project
@@ -23,6 +24,7 @@ class Kapten:
         self.slack_channel = slack_channel
         self.only_check = only_check
         self.force = force
+        self.force_update = force_update
         self.docker = DockerAPIClient()
 
     async def healthcheck(self) -> int:
@@ -133,7 +135,10 @@ class Kapten:
 
         # Update service to latest image digest
         await self.docker.service_update(
-            service.id, service.version, spec=new_service["Spec"]
+            service.id,
+            service.version,
+            spec=new_service["Spec"],
+            force_update=self.force_update,
         )
 
         return new_service

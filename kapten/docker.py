@@ -153,10 +153,14 @@ class DockerAPIClient:
         assert isinstance(result, dict), "Invalid response"
         return result
 
-    async def service_update(self, id_or_name: str, version: int, spec: Dict) -> Dict:
+    async def service_update(
+        self, id_or_name: str, version: int, spec: Dict, force_update: bool = False
+    ) -> Dict:
         url = f"/services/{id_or_name}/update"
 
         params = {"version": version}
+        spec["ForceUpdate"] = int(force_update)
+
         result = await self.request(
             "POST", url, params=params, data=spec, authenticate=True
         )

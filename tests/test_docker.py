@@ -28,7 +28,7 @@ class DockerAPIClientTestCase(KaptenTestCase):
             image = await api.distribution("foo/bar:baz")
             self.assertEqual(image["Descriptor"]["digest"], "sha256:2")
 
-    async def test_service_update(self):
+    async def test_service_update_regular_update(self):
         api = DockerAPIClient()
 
         services = [("foobar", "foo/bar:baz@sha256:1")]
@@ -37,7 +37,10 @@ class DockerAPIClientTestCase(KaptenTestCase):
             service_id = service["ID"]
             service_version = service["Version"]["Index"]
             response = await api.service_update(
-                id_or_name=service_id, version=service_version, spec=service["Spec"],
+                id_or_name=service_id,
+                version=service_version,
+                spec=service["Spec"],
+                force_update=False,
             )
             self.assertEqual(response, {"Warnings": []})
             request, response = httpx_mock["service_update"].calls[0]
@@ -45,6 +48,29 @@ class DockerAPIClientTestCase(KaptenTestCase):
             self.assertEqual(request.url.query, f"version={service_version}")
             request_body = json.loads(request.content.decode("utf-8"))
             self.assertDictEqual(request_body, service["Spec"])
+            self.assertEqual(request_body["ForceUpdate"], 0)
+
+    async def test_service_update_force_update(self):
+        api = DockerAPIClient()
+
+        services = [("foobar", "foo/bar:baz@sha256:1")]
+        with self.mock_docker(services=services) as httpx_mock:
+            service = self.build_service_response("foobar", "foo/bar:baz@sha256:1")
+            service_id = service["ID"]
+            service_version = service["Version"]["Index"]
+            response = await api.service_update(
+                id_or_name=service_id,
+                version=service_version,
+                spec=service["Spec"],
+                force_update=True,
+            )
+            self.assertEqual(response, {"Warnings": []})
+            request, response = httpx_mock["service_update"].calls[0]
+            self.assertIn(service_id, request.url.path)
+            self.assertEqual(request.url.query, f"version={service_version}")
+            request_body = json.loads(request.content.decode("utf-8"))
+            self.assertDictEqual(request_body, service["Spec"])
+            self.assertEqual(request_body["ForceUpdate"], 1)
 
     async def test_auth_header(self):
         api = DockerAPIClient()
