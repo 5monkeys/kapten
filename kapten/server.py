@@ -104,8 +104,8 @@ async def github_webhook(request):
     except KaptenAPIError as e:
         logger.warning(e)
         return Response(status_code=503)
-    except Exception as e:  # pragma: nocover
-        logger.error(e)
+    except Exception:  # pragma: nocover
+        logger.exception("Unhandled error")
         return Response(status_code=500)
 
     if not updated_services:
