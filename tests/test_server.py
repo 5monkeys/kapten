@@ -204,7 +204,7 @@ class ServerTestCase(KaptenTestCase):
         ]
         with self.mock_server(services) as http:
             payload, signature = self.build_github_payload(
-                image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002",
+                image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002"
             )
             response = http.post(
                 "/webhook/github",
@@ -262,7 +262,7 @@ class ServerTestCase(KaptenTestCase):
     def test_github_webhook_with_invalid_signature(self):
         with self.mock_server() as http:
             payload, signature = self.build_github_payload(
-                image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002",
+                image="5monkeys/app", tag="latest", digest="5monkeys/app@sha256:10002"
             )
             response = http.post(
                 "/webhook/github",
