@@ -91,8 +91,12 @@ class Kapten:
         )
 
         # Assert we got the services we asked for
-        if len(services) != len(self.service_names):
-            raise KaptenError("Could not find all tracked services")
+        missing_services = set(self.service_names) - {s.name for s in services}
+        if missing_services:
+            missing = ", ".join(sorted(missing_services))
+            raise KaptenError(
+                f"Could not find all tracked services. Missing: {missing}"
+            )
 
         # Filter by given image
         if image:

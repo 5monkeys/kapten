@@ -130,6 +130,9 @@ class CLICommandTestCase(KaptenTestCase):
             with self.assertRaises(SystemExit) as cm:
                 self.cli_command(argv)
             self.assertEqual(cm.exception.code, 666)
+            self.logger_mock.critical.assert_called_with(
+                "Could not find all tracked services. Missing: stack_app, stack_db"
+            )
 
     def test_command_error_failing_service(self):
         services = [
