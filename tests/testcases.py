@@ -161,6 +161,10 @@ class KaptenTestCase(asynctest.TestCase):
         )
         yield
 
+    def get_all_request_bodies(self, alias):
+        calls = respx.aliases[alias].calls
+        return [json.loads(c[0].content.decode("utf-8")) for c in calls]
+
     def get_request_body(self, alias, call_number=1):
         calls = respx.aliases[alias].calls
         return json.loads(calls[call_number - 1][0].content.decode("utf-8"))

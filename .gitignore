@@ -23,3 +23,8 @@ coverage.xml
 # Editor config
 .idea
 .tags
+
+# Emacs Temp/Autosaves
+*~
+\#*\#
+.#*.*
