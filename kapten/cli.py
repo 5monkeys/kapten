@@ -134,7 +134,8 @@ def command(
 def has_feature(name: str) -> bool:
     if name == "server":  # pragma: nocover
         try:
-            import uvicorn, starlette  # noqa
+            import starlette  # noqa
+            import uvicorn  # noqa
         except ImportError:
             pass
         else:

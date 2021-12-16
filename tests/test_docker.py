@@ -37,7 +37,7 @@ class DockerAPIClientTestCase(KaptenTestCase):
             service_id = service["ID"]
             service_version = service["Version"]["Index"]
             response = await api.service_update(
-                id_or_name=service_id, version=service_version, spec=service["Spec"],
+                id_or_name=service_id, version=service_version, spec=service["Spec"]
             )
             self.assertEqual(response, {"Warnings": []})
             request, response = httpx_mock["service_update"].calls[0]

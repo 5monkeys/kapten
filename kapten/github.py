@@ -23,7 +23,7 @@ def validate_signature(
 
     try:
         digest = hmac.new(
-            key=bytes(str(secret), "utf-8"), msg=request_body, digestmod=hashlib.sha1,
+            key=bytes(str(secret), "utf-8"), msg=request_body, digestmod=hashlib.sha1
         )
         return hmac.compare_digest("sha1={}".format(digest.hexdigest()), signature)
     except (ValueError, TypeError) as e:
